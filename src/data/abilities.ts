@@ -155,7 +155,7 @@ export const abilityRegistry: Record<string, AbilityDefinition> =
       a("trap", "Laço de espinhos", "⌘", "trap", 6, 1.8, 8, 22, {
         target: "GROUND",
         status: "slow",
-        description: "Armadilha: explode após breve preparação e desacelera.",
+          description: "Armadilha: explode após breve preparação e desacelera. Em alvo queimando, ativa choque térmico.",
       }),
       a("arcane", "Lança astral", "✧", "projectile", 9, 2.7, 4, 22, {
         color: 0xb5a3eb,
@@ -167,7 +167,7 @@ export const abilityRegistry: Record<string, AbilityDefinition> =
         status: "slow",
         target: "AOE_AROUND_SELF",
         tags: ["FROST", "AOE"],
-        description: "Nova ao redor que reduz movimento inimigo.",
+          description: "Nova ao redor que reduz movimento inimigo. Em alvo queimando, ativa choque térmico.",
       }),
       a("chain", "Fio da tormenta", "ϟ", "chain", 7, 1.7, 6, 28, {
         color: 0xc5ccff,
@@ -208,7 +208,7 @@ export const abilityRegistry: Record<string, AbilityDefinition> =
         color: 0xf4a05c,
         windup: 0.25,
         description:
-          "Fire Jewel: corte físico + fogo e queimadura por 4 segundos.",
+          "Fire Jewel: corte físico + fogo e queimadura por 4 segundos. Em alvo lento, ativa choque térmico: consome ambos os efeitos, +35% de dano no golpe e metade da armadura por 2 s.",
       }),
     ].map((x) => [x.id, x]),
   );

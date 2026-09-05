@@ -29,9 +29,12 @@ test("sprites gerais registradas e choque térmico visível", async ({page}) => 
   await expect.poll(() => page.evaluate(() => (window as any).__game.game.scene.getScene("World").actors.sprites.size)).toBe(10);
   const metrics = await page.evaluate(async () => {
     const g = (window as any).__game, actors = g.game.scene.getScene("World").actors;
-    const {enemyFrameRegistration} = await import("/src/rendering/EnemySprites.ts");
+    const {silhouetteBounds} = await import("/src/rendering/SpriteMetrics.ts");
     return ["slime","boar","wolf","witch","golem"].map(id => {
-      const s = actors.sprites.get(`gallery-${id}`), r = enemyFrameRegistration(s.texture,s.frame);
+      const s = actors.sprites.get(`gallery-${id}`), source = s.texture.getSourceImage();
+      const canvas = document.createElement("canvas"); canvas.width=source.width; canvas.height=source.height;
+      const ctx=canvas.getContext("2d")!; ctx.drawImage(source,0,0);
+      const r = silhouetteBounds(ctx.getImageData(0,0,canvas.width,canvas.height),{x:s.frame.cutX,y:s.frame.cutY,width:s.frame.width,height:s.frame.height});
       return {id,texture:s.texture.key,height:r.height*s.scaleY,footError:Math.abs(s.originY*s.frame.height-r.y)};
     });
   });
