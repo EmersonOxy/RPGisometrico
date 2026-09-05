@@ -1,0 +1,7 @@
+import fs from 'node:fs';const edit=(p,f)=>fs.writeFileSync(p,f(fs.readFileSync(p,'utf8')));
+edit('src/ui/InventoryView.ts',s=>s.replace('Array(capacity);','Array(capacity).fill(undefined);'));
+edit('src/ui/style.css',s=>s+'\n.game-tooltip{visibility:hidden;opacity:0}.game-tooltip.visible{visibility:visible;opacity:1}\n.panel-frame small{opacity:.9}.stock-item small{font-size:11px}.inventory-selection small,.gem-pouch small,.socket-line small{font-size:11px}\n');
+edit('src/rendering/WorldRenderer.ts',s=>s.replace('if((this.e.run.worldVersion??1)>=2&&composition(this.e.run.seed,t.x,t.y).trail){ctx.fillStyle="#b3aa7440";ctx.beginPath();ctx.ellipse(x,y+16,30,14,0,0,7);ctx.fill()}',''));
+edit('tests/core.test.ts',s=>s.replace('expect(s.schemaVersion).toBe(2)','expect(s.schemaVersion).toBe(3)'));
+edit('tests/combat.test.ts',s=>s.replace('normal.enemyDied(enemy(normal), normal.selected.id);','const normalEnemy=enemy(normal);normalEnemy.elite=true;normal.enemyDied(normalEnemy,normal.selected.id);').replace('lucky.enemyDied(enemy(lucky), lucky.selected.id);','const luckyEnemy=enemy(lucky);luckyEnemy.elite=true;lucky.enemyDied(luckyEnemy,lucky.selected.id);'));
+edit('src/combat/CombatSystem.ts',s=>s.replace('remaining:cast.a.recovery,','remaining:Math.max(0,cast.a.activeTime+cast.a.recovery+cast.remaining),').replace('this.e.fx(c, "ring", a.color, 0.16, 0.6);','if(slot>=0)this.e.bus.emit("audio","cast");\n    this.e.fx(c, "ring", a.color, 0.16, 0.6);'));

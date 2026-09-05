@@ -1,0 +1,33 @@
+import {test,expect} from "@playwright/test";
+test('sandbox descarta ou incorpora mudanças; nova jornada reinicia progresso',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/');await page.locator('[data-action=new]').click();
+  await expect(page.locator('[data-action=class][data-id=tank]')).toBeDisabled();
+  await page.locator('#seed').fill('urze-7');await page.locator('[data-action=embark]').click();
+  await page.waitForFunction(()=>(window as any).__game.engine.world.pending.size===0);
+  await page.evaluate(()=>{const e=(window as any).__game.engine;e.enemies.clear();e.tactical=true;});
+  await page.keyboard.press('F3');
+  await page.locator('[data-sandbox=silver]').fill('999');await page.locator('[data-sandbox=level]').fill('7');await page.locator('[data-sandbox=godMode]').check();
+  await page.locator('[data-action=sandbox-apply]').click();
+  expect(await page.evaluate(()=>(window as any).__game.meta.silver)).toBe(999);
+  expect(await page.evaluate(()=>(window as any).__game.engine.debugOptions.godMode)).toBe(true);
+  await page.locator('[data-action=sandbox-discard]').click();
+  expect(await page.evaluate(()=>(window as any).__game.meta.silver)).toBe(45);
+  expect(await page.evaluate(()=>(window as any).__game.engine.selected.level)).toBe(1);
+  await page.locator('[data-sandbox=silver]').fill('777');await page.locator('[data-action=sandbox-apply]').click();
+  await page.evaluate(()=>(window as any).__game.save());
+  await page.reload();await page.locator('[data-action=continue]').click();
+  expect(await page.evaluate(()=>(window as any).__game.meta.silver)).toBe(45);
+  await page.keyboard.press('F3');await page.locator('[data-sandbox=silver]').fill('777');await page.locator('[data-sandbox=level]').fill('7');await page.locator('[data-action=sandbox-apply]').click();
+  await page.screenshot({path:'artifacts/sandbox-panel.png'});
+  await page.locator('[data-action=sandbox-keep]').click();
+  await page.evaluate(async()=>{const g=(window as any).__game;g.engine.shop.active='qa';g.engine.shop.unlock('mage');g.engine.run.marker={x:80,y:90};g.engine.run.commandSelection=[g.engine.selected.id];g.meta.settings.volume=.13;await g.save();});
+  await page.reload();await page.locator('[data-action=continue]').click();
+  expect(await page.evaluate(()=>(window as any).__game.meta.unlockedClasses)).toContain('mage');
+  await page.keyboard.press('Escape'); // clears command selection
+  await page.keyboard.press('Escape');await page.locator('[data-action=menu]').click();
+  await page.locator('[data-action=new]').click();await page.locator('#seed').fill('fresh');await page.locator('[data-action=embark]').click();
+  const state=await page.evaluate(()=>{const g=(window as any).__game;return {silver:g.meta.silver,gold:g.meta.gold,classes:g.meta.unlockedClasses,level:g.engine.selected.level,marker:g.engine.run.marker,volume:g.meta.settings.volume,selection:g.engine.run.commandSelection,inventory:g.engine.run.inventory};});
+  expect(state).toEqual({silver:45,gold:2,classes:['fighter'],level:1,marker:undefined,volume:.13,selection:[],inventory:[]});
+  expect(errors).toEqual([]);
+});
