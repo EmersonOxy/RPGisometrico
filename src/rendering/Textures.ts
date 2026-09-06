@@ -127,15 +127,15 @@ export function createTextures(scene: Phaser.Scene) {
     poly(g, 0x739088, [18, 98, 56, 9, 90, 99]);
     poly(g, 0xc1d1c4, [27, 65, 56, 4, 83, 65]);
   });
-  texture(scene, "rock", 88, 70, (g) => {
-    g.fillStyle(0x24382f, 0.3);
-    g.fillEllipse(43, 59, 76, 17);
-    poly(g, 0x7b8576, [5, 47, 19, 20, 53, 12, 79, 33, 73, 57, 33, 65]);
-    poly(g, 0xa7ad95, [19, 20, 53, 12, 63, 33, 38, 41, 5, 47]);
-    poly(g, 0x596b60, [38, 41, 63, 33, 79, 33, 73, 57, 33, 65]);
-    g.lineStyle(1, 0xc0bfa1);
-    g.lineBetween(21, 23, 49, 16);
-  });
+  // Pedras do mapa são pixel-art 32x32 (assets/sprite/world): NEAREST para
+  // ampliar nítido. A textura procedural antiga foi removida.
+  for (const key of ["rock-big", "rock-med", "rock-small-a", "rock-small-b"])
+    if (scene.textures.exists(key))
+      scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+  // Vegetação rasteira (assets/sprite/vegetation), assada no canvas do chão.
+  for (const key of ["veg-bush-med", "veg-bush-small", "veg-grass", "veg-sunflower", "veg-pumpkin"])
+    if (scene.textures.exists(key))
+      scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
   texture(scene, "cactus", 70, 112, (g) => {
     g.fillStyle(0x374c35, 0.25);
     g.fillEllipse(35, 99, 54, 12);

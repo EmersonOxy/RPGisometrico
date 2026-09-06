@@ -54,6 +54,9 @@ export type StatPointType =
 export interface Character extends Point {
   skillNodes?: string[];
   loadout?: string[];
+  skillTreeVersion?: number;
+  skillPointsSpent?: number;
+  treeSelection?: string;
   combatUntil?: number;
   id: string;
   classId: ClassId;
@@ -220,7 +223,7 @@ export interface MetaProgress {
   statistics: { runs: number; kills: number };
 }
 export interface Save {
-  schemaVersion: 3 | 4 | 5;
+  schemaVersion: 3 | 4 | 5 | 6;
   meta: MetaProgress;
   run: RunState | null;
 }

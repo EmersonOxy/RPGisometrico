@@ -101,5 +101,6 @@ export class ChunkManager {
     this.disposed = true;
     this.worker?.terminate();
     this.chunks.clear();
+    this.pending.clear();
   }
 }

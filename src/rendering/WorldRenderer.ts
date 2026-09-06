@@ -71,16 +71,20 @@ export class WorldRenderer {
       for (const t of c.tiles) {
         const p = worldToIso(t);
         if (t.blocked) {
+          // Pedras pixel-art: varia entre grande/média/pequenas por posição.
+          const rockTex = ["rock-big", "rock-med", "rock-small-a", "rock-small-b"][
+            Math.abs((t.x * 7 + t.y * 11) % 4)
+          ];
           const tex =
             t.biome === "desert"
               ? "cactus"
               : t.biome === "ice"
                 ? "pine"
                 : t.biome === "mountain"
-                  ? "rock"
+                  ? rockTex
                   : t.variant < 3
                     ? "tree" + (t.variant % 3)
-                    : "rock";
+                    : rockTex;
           if (tex.startsWith("tree") || tex === "pine") {
             const v = tex === "pine" ? 3 : Math.abs((t.x * 7 + t.y * 11) % 6),
               scale = 0.8 + (Math.abs(t.x + t.y) % 3) * 0.09;
@@ -103,6 +107,7 @@ export class WorldRenderer {
             .setOrigin(0.5, 0.9)
             .setDepth(p.y + 22);
           if (tex.startsWith("tree")) obj.setScale(0.68 + t.variant * 0.065);
+          if (tex.startsWith("rock-")) obj.setScale(2);
           objects.push(obj);
         }
       }
@@ -111,7 +116,28 @@ export class WorldRenderer {
       canvas.width = tw * n;
       canvas.height = th * (n + 1);
       const ctx = canvas.getContext("2d")!;
+      ctx.imageSmoothingEnabled = false;
       const origin = worldToIso({ x: c.cx * n, y: c.cy * n });
+      // Vegetação rasteira (assets/sprite/vegetation + pedrinhas), assada no
+      // chão. Cada bioma tem seu pool ponderado [textura, peso]: pesos
+      // baixos = aparições raras (girassol/abóbora são acentos).
+      const UNDERGROWTH: Record<string, [string, number][]> = {
+        plains: [["veg-grass", 5], ["veg-bush-small", 3], ["veg-bush-med", 3], ["veg-sunflower", 1], ["veg-pumpkin", 1]],
+        forest: [["veg-grass", 5], ["veg-bush-small", 4], ["veg-bush-med", 4], ["veg-sunflower", 1], ["veg-pumpkin", 1]],
+        desert: [["veg-grass", 4], ["veg-bush-small", 2], ["rock-small-a", 2], ["rock-small-b", 1]],
+        swamp: [["veg-grass", 5], ["veg-bush-small", 3], ["veg-bush-med", 2], ["veg-pumpkin", 1]],
+        ice: [["veg-grass", 3], ["veg-bush-small", 1], ["rock-small-a", 1]],
+        mountain: [["veg-grass", 3], ["veg-bush-small", 2], ["rock-small-a", 2], ["rock-small-b", 2]],
+      };
+      const SPRITE_SIZE: Record<string, number> = {
+        "veg-grass": 32, "veg-bush-small": 32, "veg-bush-med": 56,
+        "veg-sunflower": 60, "veg-pumpkin": 48,
+        "rock-small-a": 32, "rock-small-b": 32,
+      };
+      const vegImgs = new Map<string, { img: CanvasImageSource; size: number }>();
+      for (const [k, size] of Object.entries(SPRITE_SIZE))
+        if (this.scene.textures.exists(k))
+          vegImgs.set(k, { img: this.scene.textures.get(k).getSourceImage() as CanvasImageSource, size });
       for (const t of c.tiles) {
         const pos = worldToIso(t),
           x = pos.x - origin.x + (tw * n) / 2,
@@ -140,20 +166,20 @@ export class WorldRenderer {
         ctx.lineWidth = 1.1;
         ctx.stroke();
 
-        if (t.decor === 2) {
-          ctx.strokeStyle = t.biome === "desert" ? "#c1ae7a" : "#95a875";
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          for (let i = 0; i < 3; i++) {
-            ctx.moveTo(x + i * 4 - 5, y + 19);
-            ctx.lineTo(x + i * 4 - 7, y + 14 - i);
+        if (t.decor === 2 || t.decor === 3) {
+          const pool = UNDERGROWTH[t.biome] ?? UNDERGROWTH.plains;
+          const total = pool.reduce((n, [, w]) => n + w, 0);
+          let roll = Math.abs((t.x * 5 + t.y * 7 + t.decor) % total);
+          let key = pool[0][0];
+          for (const [k, w] of pool) {
+            if (roll < w) { key = k; break; }
+            roll -= w;
           }
-          ctx.stroke();
-        }
-        if (t.decor === 3) {
-          ctx.fillStyle = "#b7b697";
-          ctx.fillRect(x - 3, y + 15, 3, 2);
-          ctx.fillRect(x + 4, y + 21, 2, 2);
+          const veg = vegImgs.get(key);
+          if (veg) {
+            const jx = ((t.x * 3 + t.y * 5) % 9) - 4;
+            ctx.drawImage(veg.img, x - veg.size / 2 + jx, y + 22 - veg.size, veg.size, veg.size);
+          }
         }
       }
       this.scene.textures.addCanvas(textureKey, canvas);
@@ -177,13 +203,14 @@ export class WorldRenderer {
                     ? "ruin"
                     : p.kind === "nest"
                       ? "nest"
-                      : p.kind === "elite"
-                        ? "elite"
-                        : "rock";
+                        : p.kind === "elite"
+                          ? "elite"
+                          : "rock-med";
         const sprite = this.scene.add
           .image(pos.x, pos.y, tex)
           .setOrigin(0.5, 0.86)
           .setDepth(pos.y);
+        if (tex.startsWith("rock-")) sprite.setScale(2);
         objects.push(sprite);
         const site=poiDefinition(p);
         if(site) {

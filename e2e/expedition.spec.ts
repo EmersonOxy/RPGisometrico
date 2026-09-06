@@ -78,9 +78,10 @@ test("expedição completa: combate, loot, joias, recrutamento, save e permadeat
   await page.screenshot({ path: "artifacts/inventory.png" });
   await page.keyboard.press("Escape");
   await page.keyboard.press("k");
-  await expect(
-    page.locator(".skill-node b").filter({ hasText: "Talho de brasa" }).first(),
-  ).toBeVisible();
+  await page.evaluate(async()=>{const e=(window as any).__game.engine;const {addExperience}=await import('/src/progression/Character.ts');const {xpRequiredForLevel}=await import('/src/data/balance.ts');addExperience(e.selected,xpRequiredForLevel(e.selected.level));e.bus.emit('changed');});
+  await page.locator('.skill-learn').click();
+  await page.locator('[data-action=tree-equip][data-id="heavy"]').click();
+  await expect(page.locator('.skill-inspector h3')).toHaveText('Talho de brasa');
   await page.screenshot({ path: "artifacts/skills.png" });
   await page.keyboard.press("Escape");
   await clickWorld(9, 1);

@@ -144,6 +144,15 @@ export class WorldScene extends Phaser.Scene {
     loadPlayerSheets(this);
     loadEnemySheets(this);
     this.load.image("attack-melee", new URL("../../assets/sprite/ui/combat/attack_melee.png", import.meta.url).href);
+    this.load.image("rock-big", new URL("../../assets/sprite/world/pedra_grande.png", import.meta.url).href);
+    this.load.image("rock-med", new URL("../../assets/sprite/world/pedra_media.png", import.meta.url).href);
+    this.load.image("rock-small-a", new URL("../../assets/sprite/world/pedra_pequena_1.png", import.meta.url).href);
+    this.load.image("rock-small-b", new URL("../../assets/sprite/world/pedra_pequena_2.png", import.meta.url).href);
+    this.load.image("veg-bush-med", new URL("../../assets/sprite/vegetation/arbusto_medio.png", import.meta.url).href);
+    this.load.image("veg-bush-small", new URL("../../assets/sprite/vegetation/arbusto_pequeno.png", import.meta.url).href);
+    this.load.image("veg-grass", new URL("../../assets/sprite/vegetation/mato_medio.png", import.meta.url).href);
+    this.load.image("veg-sunflower", new URL("../../assets/sprite/vegetation/girassol.png", import.meta.url).href);
+    this.load.image("veg-pumpkin", new URL("../../assets/sprite/vegetation/abobora.png", import.meta.url).href);
   }
 
   create() {

@@ -1,3 +1,4 @@
+import { giveTestKit } from "./skill-fixtures";
 import { afterEach, describe, it, expect } from "vitest";
 import { InputBuffer } from "../src/combat/InputBuffer";
 import { Engine } from "../src/core/Engine";
@@ -24,7 +25,7 @@ function setup() {
       new EventBus(),
       async () => {},
     );
-  engines.push(e);
+  engines.push(e); giveTestKit(e.selected);
   return e;
 }
 const foe: Enemy = {
@@ -175,7 +176,7 @@ describe("Compatibilidade de mundos", () => {
     m.gold = 7;
     const before = structuredClone(r),
       s = migrateSave({ schemaVersion: 2, meta: m, run: r });
-    expect(s.schemaVersion).toBe(4);
+    expect(s.schemaVersion).toBe(6);
     expect(s.run?.worldVersion).toBe(1);
     expect(s.run?.party).toEqual(before.party);
     expect(s.run?.inventory).toEqual(before.inventory);

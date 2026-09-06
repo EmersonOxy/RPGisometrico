@@ -1,3 +1,4 @@
+import { giveTestKit } from "./skill-fixtures";
 import { describe, it, expect, vi } from "vitest";
 import { InputManager, DEFAULT_KEYBINDINGS } from "../src/core/InputManager";
 import { DiscoveryMask } from "../src/world/DiscoveryMask";
@@ -163,7 +164,7 @@ describe("Terceira Passagem de Polimento - Input, Mascara, Atributos e Ordens", 
       expect(ts.state).toBeNull();
 
       // Start preview for ability slot 0
-      ts.startPreview(0, { x: 5, y: 5 });
+      giveTestKit(engine.selected); ts.startPreview(0, { x: 5, y: 5 });
       expect(ts.state).not.toBeNull();
       expect(ts.state?.slot).toBe(0);
 
@@ -210,7 +211,7 @@ describe("Terceira Passagem de Polimento - Input, Mascara, Atributos e Ordens", 
       engine.selected.target = enemyId;
 
       // Slot 0 for fighter is basic attack / skill
-      const result = engine.targeting.executeAbility(0, { x: 10, y: 10 });
+      giveTestKit(engine.selected); const result = engine.targeting.executeAbility(0, { x: 10, y: 10 });
       // Smart approach started
       expect(result).toBe(true);
       expect(engine.targeting.pendingSkill).not.toBeNull();

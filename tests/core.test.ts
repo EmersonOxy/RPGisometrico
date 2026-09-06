@@ -1,3 +1,4 @@
+import { giveTestKit } from "./skill-fixtures";
 import { describe, it, expect, afterEach } from "vitest";
 import "fake-indexeddb/auto";
 import {
@@ -91,7 +92,7 @@ describe("Progressão e loot", () => {
   });
   it("07 Fire Jewel habilita Talho de brasa e Burn", () => {
     const c = createCharacter("fighter", "c");
-    c.jewels = ["fire"];
+    giveTestKit(c); c.jewels = ["fire"];
     expect(activeAbilities(c)[0]).toBe("flame");
     expect(abilityRegistry[activeAbilities(c)[0]].status).toBe("burn");
   });
@@ -163,7 +164,7 @@ describe("Persistência e morte", () => {
       unlockedClasses: ["tank"],
       run: null,
     });
-    expect(s.schemaVersion).toBe(4);
+    expect(s.schemaVersion).toBe(6);
     expect(s.meta.gold).toBe(3);
     expect(s.meta.unlockedClasses).toContain("tank");
   });

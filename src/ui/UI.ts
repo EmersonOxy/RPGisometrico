@@ -12,7 +12,7 @@ import { EventBus } from "../core/EventBus";
 import { PanelController, type PanelId } from "./PanelController";
 import { Tooltip } from "./Tooltip";
 import { AtlasView, atlasMarkup, type AtlasState } from "./AtlasView";
-import { SkillTreeView, skillTreeView } from "./SkillTreeView";
+import { SkillTreeView, skillTreeView, skillDetails } from "./SkillTreeView";
 import type { ViewTransform } from "./PanZoom";
 import { InventoryDrag, inventoryView } from "./InventoryView";
 import { shopView } from "./ShopView";
@@ -50,7 +50,7 @@ import { statsFor } from "../progression/Character";
 import type { RadialWheel } from "./RadialWheel";
 import { worldSettings, type WorldGenerationSettings } from "../data/worldSettings";
 import { skillNodeRegistry } from "../data/skillTree";
-import { skillRequirement, effectiveAbility } from "../progression/SkillTree";
+import { skillRequirement, effectiveAbility, learnedNode } from "../progression/SkillTree";
 
 interface App {
   sandbox: boolean;
@@ -81,6 +81,8 @@ export class UI {
   private tree?: SkillTreeView;
   private atlasState: AtlasState = { x: 0, y: 0, zoom: 8, initialized: false };
   private treeState: ViewTransform = { x: 0, y: 0, zoom: 1 };
+  /** Habilidade aguardando escolha de slot ("Substituir qual?"). */
+  private treeReplace: string | null = null;
   private menuMode = true;
   private choice: ClassId = "fighter";
   private selectedItem?: string;
@@ -178,11 +180,6 @@ export class UI {
       }
     });
     this.root.addEventListener("change", (ev) => {
-      const loadout=ev.target as HTMLSelectElement;
-      if(loadout.matches("[data-loadout-slot]")) {
-        this.app.engine?.command({type:"loadout",id:loadout.value,slot:Number(loadout.dataset.loadoutSlot)});
-        this.refreshPanel();return;
-      }
       const t = ev.target as HTMLInputElement | HTMLSelectElement,
         k = t.dataset.setting,
         s = this.app.meta.settings as Record<string, unknown>;
@@ -326,7 +323,7 @@ export class UI {
         "<p>A jornada fica à sua espera.</p></section>";
     else if (e) {
       if (top === "inventory") content = inventoryView(e, this.selectedItem);
-      if (top === "skills") content = skillTreeView(e);
+      if (top === "skills") content = skillTreeView(e, this.treeReplace ?? undefined);
       if (top === "map") content = atlasMarkup(e.run.seed);
       if (top === "shop") content = shopView(e);
       if (top === "over") {
@@ -513,10 +510,7 @@ export class UI {
       );
     }
     if(kind==="skill") {
-      const n=skillNodeRegistry[id]; if(!n||!c)return "";
-      const name=n.ability?abilityRegistry[n.ability].name:n.passive?passiveRegistry[n.passive].name:n.name;
-      const description=n.ability?abilityRegistry[n.ability].description:n.passive?passiveRegistry[n.passive].description:n.description;
-      return `<h3>${esc(name)}</h3><p>${esc(description)}</p><p>${n.ability?"Ativa desbloqueável":n.upgrade?"Melhoria de habilidade":n.condition?"Talento condicional":"Passivo"} · nível ${n.level} · ${n.cost} ponto(s)</p><p>Requisitos: ${n.prerequisites.map(p=>skillNodeRegistry[p].name).join(", ")||"Núcleo da classe"}</p><p>${skillRequirement(c,id)}</p>`;
+      const n=skillNodeRegistry[id];return n&&e ? skillDetails(e,n) : "";
     }
     if (kind === "mastery")
       return "<h3>Maestria</h3><p>Aumenta o dano com retornos decrescentes. Pode ser aprendida repetidamente.</p><p>Custo: 1 ponto</p>";
@@ -592,7 +586,7 @@ export class UI {
           c.equipment,
           c.jewels,
             c.passives,
-            c.skillNodes, c.loadout,
+            c.skillNodes, c.loadout, c.level, top === "skills" ? e.canChangeLoadout() : null,
           e.run.inventory,
           e.run.jewels,
           e.meta.silver,
@@ -600,7 +594,7 @@ export class UI {
           e.meta.unlockedClasses,
           e.run.party.length,
         ]);
-      if (this.lastPanelKey && this.lastPanelKey !== key) {
+      if (this.lastPanelKey !== key) {
         this.syncPanel();
       }
       this.lastPanelKey = key;
@@ -843,8 +837,83 @@ export class UI {
         this.atlas?.zoom(id === "in" ? 1.25 : 0.8);
         return;
       case "tree-home":
-        this.tree?.pan.home();
+        this.tree?.home();
         return;
+      case "tree-all":
+        this.tree?.overview(); return;
+      case "tree-select":
+        if(e && skillNodeRegistry[id]?.classId===e.selected.classId){e.selected.treeSelection=id;this.treeReplace=null;this.refreshPanel();}
+        return;
+      case "tree-equip": {
+        // "ability" = automático (primeiro vazio ou pergunta qual substituir);
+        // "ability|slot" = explícito (slots, atalhos, fluxo legado).
+        const [ability, slotRaw] = id.split("|");
+        if (!e) return;
+        if (slotRaw !== undefined && slotRaw !== "") {
+          this.equipIntoSlot(ability, Number(slotRaw));
+          return;
+        }
+        const node = Object.values(skillNodeRegistry).find(n => n.classId === e.selected.classId && n.ability === ability);
+        if (!ability || !node || !learnedNode(e.selected, node.id)) {
+          this.notice("Selecione uma habilidade ativa aprendida para equipar.");
+          return;
+        }
+        if (!e.canChangeLoadout()) {
+          this.notice("Em combate: troca bloqueada. Aguarde 5 s sem ações hostis e o fim das ameaças.");
+          return;
+        }
+        const loadout = e.selected.loadout ?? ["", "", "", ""];
+        const empty = loadout.findIndex(s => !s);
+        if (empty >= 0) this.equipIntoSlot(ability, empty);
+        else {
+          this.treeReplace = ability;
+          this.refreshPanel();
+          this.notice("Slots cheios — escolha qual substituir.");
+        }
+        return;
+      }
+      case "tree-replace": {
+        this.treeReplace = id || null;
+        this.refreshPanel();
+        return;
+      }
+      case "tree-slot": {
+        const slot = Number(id);
+        if (!e || !Number.isInteger(slot) || slot < 0 || slot > 3) return;
+        if (this.treeReplace) {
+          this.equipIntoSlot(this.treeReplace, slot);
+          return;
+        }
+        const node = skillNodeRegistry[e.selected.treeSelection ?? ""];
+        const ability = node?.ability;
+        if (ability && node.classId === e.selected.classId && learnedNode(e.selected, node.id) && e.selected.loadout?.[slot] !== ability) {
+          this.equipIntoSlot(ability, slot);
+          return;
+        }
+        const current = e.selected.loadout?.[slot];
+        const target = current && Object.values(skillNodeRegistry).find(n => n.classId === e.selected.classId && n.ability === current);
+        if (target) {
+          e.selected.treeSelection = target.id;
+          this.refreshPanel();
+        } else {
+          this.notice("Slot vazio — selecione uma habilidade aprendida e equipe.");
+        }
+        return;
+      }
+      case "tree-unequip": {
+        if (!e) return;
+        if (!e.canChangeLoadout()) {
+          this.notice("Em combate: troca bloqueada. Aguarde 5 s sem ações hostis e o fim das ameaças.");
+          return;
+        }
+        const loadout = e.selected.loadout ?? [];
+        loadout.forEach((ab, i) => { if (ab === id) e.command({ type: "loadout", id: "", slot: i }); });
+        this.treeReplace = null;
+        this.bus.emit("audio", "equip");
+        this.refreshPanel();
+        this.notice("Habilidade removida do carregamento.");
+        return;
+      }
       case "tree-zoom":
         this.tree?.pan.zoom(id === "in" ? 1.2 : 0.83);
         return;
@@ -910,6 +979,38 @@ export class UI {
     if (this.panels.top) this.refreshPanel();
     else this.refresh();
   }
+  private treeSlotKey(slot: number) {
+    return bindingLabel(this.app.meta.settings, `ABILITY_${slot + 1}` as InputAction);
+  }
+  /** Equipa habilidade em slot explícito (botões, slots, atalhos). */
+  private equipIntoSlot(ability: string, slot: number): boolean {
+    const e = this.app.engine;
+    if (!e || e.run.ended || !Number.isInteger(slot) || slot < 0 || slot > 3) return false;
+    if (!e.canChangeLoadout()) {
+      this.notice("Em combate: troca bloqueada. Aguarde 5 s sem ações hostis e o fim das ameaças.");
+      return false;
+    }
+    e.command({ type: "loadout", id: ability, slot });
+    this.treeReplace = null;
+    this.bus.emit("audio", "equip");
+    this.refreshPanel();
+    const name = effectiveAbility(e.selected, ability)?.name ?? abilityRegistry[ability]?.name ?? ability;
+    if ((e.selected.loadout ?? [])[slot] === ability)
+      this.notice(`${name} equipada em ${this.treeSlotKey(slot)}.`);
+    return true;
+  }
+  /** Atalhos Q/W/E/R com a árvore aberta equipam a seleção (nunca conjuram). */
+  private equipSelectedInto(slot: number) {
+    const e = this.app.engine;
+    if (!e || e.run.ended || this.menuMode) return;
+    const node = skillNodeRegistry[e.selected.treeSelection ?? ""];
+    const ability = node?.ability;
+    if (!ability || node.classId !== e.selected.classId || !learnedNode(e.selected, node.id)) {
+      this.notice("Selecione uma habilidade ativa aprendida para equipar.");
+      return;
+    }
+    this.equipIntoSlot(ability, slot);
+  }
   private handleInputAction(
     action: InputAction,
     down: boolean,
@@ -929,6 +1030,10 @@ export class UI {
     if (this.panels.top) {
       if (this.panels.isFloating() && action === "PAUSE_MENU" && down) {
         this.panels.close();
+        return;
+      }
+      if (down && !ev.repeat && this.panels.top === "skills" && action.startsWith("ABILITY_")) {
+        this.equipSelectedInto(Number(action.slice(-1)) - 1);
         return;
       }
       if (

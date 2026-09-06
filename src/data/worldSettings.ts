@@ -16,6 +16,6 @@ export const difficultyRegistry = {
 export const populationBalance = { maxChunkBudget: 8, encounterSpacing: 23, safeRadius: 11, activeRadius: 30, maxActiveEnemies: 64, maxAmbient: 48, ambientRadius: 26, ambientTick: 1.5 };
 export function worldSettings(value?: Partial<WorldGenerationSettings>): WorldGenerationSettings {
   const s = { ...defaultWorldSettings, ...value };
-  if (!(s.biomeScale in biomeScales) || !(s.difficulty in difficultyRegistry) || !(s.threatDensity in threatDensities)) throw Error("Configuração de expedição inválida");
+  if (!Object.hasOwn(biomeScales,s.biomeScale) || !Object.hasOwn(difficultyRegistry,s.difficulty) || !Object.hasOwn(threatDensities,s.threatDensity)) throw Error("Configuração de expedição inválida");
   return s;
 }

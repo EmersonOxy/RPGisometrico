@@ -480,6 +480,14 @@ input[type="range"] {
   height: 43px;
   filter: drop-shadow(1px 3px 2px #15291f);
 }
+.skill-face img.basic-icon {
+  width: auto;
+  height: 43px;
+  image-rendering: pixelated;
+  pointer-events: none;
+  -webkit-user-drag: none;
+  filter: drop-shadow(1px 3px 2px #15291f);
+}
 .ability kbd {
   position: absolute;
   bottom: 2px;
@@ -1111,10 +1119,11 @@ input[type="range"] {
 }
 .skill-node.available .node-medallion {
   box-shadow:
-    0 0 0 5px #95a17444,
-    0 0 18px #95a17466;
+    0 3px 6px #4a573c33,
+    inset 0 0 0 4px #384d3e;
   border-color: #677d48;
-  animation: breathe 2s ease-in-out infinite;
+  outline: 2px solid #8a9468;
+  outline-offset: 2px;
 }
 .node-mark {
   position: absolute;
@@ -1736,13 +1745,6 @@ input[type="range"] {
   animation: none !important;
   transition: none !important;
 }
-@keyframes breathe {
-  50% {
-    box-shadow:
-      0 0 0 7px #95a17422,
-      0 0 20px #95a17455;
-  }
-}
 @media (max-height: 820px) {
   .panel-shade {
     padding: 18px;
@@ -2316,6 +2318,18 @@ button:active,
 .stat-add-btn:active {
   transform: scale(0.9);
 }
+/* Botões escuros dentro de painéis: o texto claro precisa vencer a regra
+   genérica .panel-frame button (que pinta texto escuro para pergaminho). */
+.panel-frame .stat-add-btn {
+  color: #ede4cd;
+}
+.panel-frame .skill-learn:not(:disabled),
+.panel-frame .skill-equip:not(:disabled) {
+  color: #eee5c4;
+}
+.panel-frame .panel-close {
+  color: #526048;
+}
 
 /* Numeric XP Text */
 .xp-text {
@@ -2631,3 +2645,314 @@ body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::aft
 .expanded-tree .skill-node b {font-size:24px;}
 .discipline-branch {position:absolute;transform:translateX(-50%);font:italic 26px Georgia;color:#536449;}
 @media(max-height:800px){.selection-sheet{padding:16px}.selection-sheet .class-banner{padding:12px}.expedition-settings{margin:8px 0;}}
+
+/* Organic disciplines: ink, linen and restrained directional relief. */
+.organic-book .screen-heading {padding-bottom:8px}
+.tree-workspace {display:flex;flex:1;min-height:0;border-top:1px solid #8f927355}
+.organic-book .tree-viewport {background:linear-gradient(125deg,#d6d4b6,#c4c9a8);border-right:1px solid #8b9275}
+.organic-tree.tree-world {left:0;top:0;width:1840px;height:1430px;margin:0;transform-origin:0 0}
+.organic-tree .tree-connections path {stroke:#788168;stroke-width:3;stroke-linecap:round}
+.organic-tree .tree-connections path.learned {stroke:#54705b;stroke-width:5}
+.organic-tree .tree-connections path.related {stroke:#344d42;stroke-width:4}
+.organic-tree .skill-node {width:194px;color:#2c4035;opacity:1}
+.organic-tree .skill-node b {font-size:21px;line-height:1.08;background:#ccd0ae;padding:3px 6px;border-radius:3px}
+.organic-tree .skill-node small {font:12px/1.25 Georgia,serif;background:#ccd0ae;margin:0;padding:3px}
+.organic-tree .node-medallion {width:62px;height:62px;background:#d9d8bc;border:3px double #7d8566;box-shadow:2px 5px 6px #3443312b,inset 1px 1px 0 #f1ebd3;animation:none}
+.organic-tree .node-medallion svg {width:40px;height:40px;filter:none}
+.organic-tree .locked .node-medallion {background:#b7bda1;border-color:#939a7e;filter:grayscale(.8)}
+.organic-tree .locked b,.organic-tree .locked small {color:#53634d}
+.organic-tree .available .node-medallion {background:#f1e4bb;border-color:#796b43;box-shadow:2px 5px 6px #3443312b,inset 1px 1px 0 #fff2d0;animation:none}
+.organic-tree .unlocked .node-medallion {background:#71896a;border-color:#3d5b47}
+.organic-tree .chosen .node-medallion {outline:3px solid #344d42;outline-offset:5px}
+.organic-tree .equipped .node-medallion {border-color:#725e34;background:#c4b57e}
+.organic-tree .type-passive .node-medallion,.organic-tree .type-conditional .node-medallion {border-radius:14px}
+.organic-tree .type-upgrade .node-medallion {border-radius:4px;border-style:solid}
+.organic-tree .type-mastery .node-medallion {width:72px;height:72px;border-width:5px}
+.organic-tree .node-mark {background:#344d42;color:#f1e7c8;font-size:12px;padding:2px 5px;border-radius:50%;right:-5px;bottom:-2px}
+.organic-tree .skill-node:focus-visible {outline:2px dashed #354c3c;outline-offset:10px}
+.organic-branch {position:absolute;transform:translateX(-50%);text-align:center;font:italic 29px Georgia,serif;color:#52634b;white-space:nowrap;border-bottom:1px solid #7f8b6c;padding:8px 22px}
+.organic-branch small {display:block;font:11px Georgia,serif;letter-spacing:2px;margin-bottom:7px}
+.foundation-label {position:absolute;font:italic 25px Georgia,serif;color:#647253;line-height:1.4}
+.foundation-label small {font-size:17px}
+.skill-inspector {width:300px;flex-shrink:0;overflow:auto;padding:22px;background:#e1dec4;color:#2e4336;box-shadow:inset 5px 0 9px #4852350a}
+.skill-inspector h3 {font:29px/1.05 'Cormorant Garamond',Georgia,serif;margin:10px 0}
+.skill-inspector p {font-size:13px;line-height:1.5;margin:12px 0}
+.node-kind {font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#657052}
+.skill-facts {font-size:12px;margin:14px 0}
+.skill-facts div {display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #a4aa8844;padding:6px 0}
+.skill-facts dt {color:#5c6b51}.skill-facts dd {margin:0;text-align:right}
+.skill-inspector .skill-state {border-top:1px solid #a4aa88;padding-top:12px;font-weight:bold}
+.skill-learn {width:100%;background:#405c48;color:#eee5c4;border:1px solid #304c3b;padding:12px;box-shadow:1px 3px 4px #253c3222}
+.skill-learn:disabled {background:#c7c9ae;color:#657158;box-shadow:none}
+.skill-equip-actions {display:flex;gap:8px}.skill-equip-actions button {flex:1;padding:9px}
+.skill-relatives {margin-top:18px;display:grid;gap:7px}.skill-relatives button {font-size:12px;text-align:left}
+.tree-map-note {position:absolute;left:12px;bottom:10px;font-size:10px;color:#56664e;pointer-events:none}
+.organic-book .screen-footer {gap:8px}.organic-book .screen-footer>div {display:flex;gap:6px}
+.empty-skill .skill-face {opacity:.4}.empty-skill {border-style:dashed!important}
+@media(max-width:850px){.skill-inspector{width:230px;padding:14px}.skill-inspector h3{font-size:24px}.organic-book .screen-footer>span{max-width:180px;font-size:10px}}
+@media(max-width:580px){.tree-workspace{flex-direction:column}.skill-inspector{width:auto;max-height:190px;flex-shrink:0;padding:10px 14px}.organic-book .tree-viewport{min-height:230px}.organic-book .screen-footer>span{display:none}}
+
+.skill-equip-actions button {background:#405c48;color:#f0e7c8;border-color:#304b3a}
+
+/* ============ Trilhas de disciplina: polimento de interação ============ */
+/* A árvore comporta-se como peça de jogo: sem seleção de texto, sem drag
+   nativo, sem saltos ao clicar, sem glow. Sombras 2D pequenas e chapadas. */
+
+/* --- Comportamento de jogo: sem texto selecionável nem drag nativo --- */
+.tree-book, .tree-book button {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tree-book input, .tree-book textarea, .tree-book select, .tree-book [contenteditable] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+.tree-book img, .tree-book svg {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+/* O clique pertence ao nó/slot, nunca ao texto ou ícone interno. */
+.tree-book .node-medallion, .tree-book .node-medallion *,
+.tree-book .skill-node b, .tree-book .skill-node small,
+.tree-book .slot-badge, .tree-book .node-mark,
+.tree-book .organic-branch, .tree-book .foundation-label,
+.tree-book .tree-map-note, .tree-book .tree-connections,
+.tree-book .loadout-slot > * {
+  pointer-events: none;
+}
+.tree-book .tree-viewport {
+  touch-action: none;
+}
+.tree-book .tree-viewport.panning {
+  cursor: grabbing;
+}
+
+/* --- Geometria estável: nó nunca salta ao clicar --- */
+.tree-book .skill-node:active {
+  transform: translate(-50%, -50%);
+}
+.tree-book .skill-node:active .node-medallion {
+  border-color: #4c5a44;
+  box-shadow:
+    1px 2px 3px #3443312b,
+    inset 2px 2px 3px #34433155;
+}
+
+/* --- Bloqueado legível: sem opacity no nó inteiro --- */
+.organic-tree .skill-node.locked {
+  opacity: 1;
+}
+.organic-tree .locked .node-medallion {
+  filter: grayscale(.6);
+}
+.organic-tree .locked b, .organic-tree .locked small {
+  color: #3d4c38;
+}
+.organic-tree .locked small {
+  background: #c3c8a6;
+}
+
+/* --- Selecionado: contorno definido + sombra 2D chapada, sem glow --- */
+.organic-tree .chosen .node-medallion {
+  outline: 3px solid #344d42;
+  outline-offset: 5px;
+  box-shadow:
+    2px 4px 0 #344d42,
+    2px 5px 6px #3443312b,
+    inset 1px 1px 0 #f1ebd3;
+}
+
+/* --- Disponível: aro duplo claro, sem glow nem respiração --- */
+.organic-tree .available .node-medallion {
+  outline: 2px solid #9aa273;
+  outline-offset: 2px;
+}
+
+/* --- Badge de slot: plaquinha de bronze presa ao medalhão --- */
+.organic-tree .slot-badge, .slot-badge {
+  position: absolute;
+  left: -8px;
+  top: -8px;
+  min-width: 25px;
+  height: 25px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  background: #725e34;
+  color: #f1e7c8;
+  border: 1px solid #4c3f22;
+  border-radius: 3px;
+  font: bold 13px Georgia, serif;
+  font-style: normal;
+  box-shadow: 1px 2px 0 #2c3a2c;
+}
+
+/* --- Cabeçalho enxuto: árvore começa perto do topo --- */
+.organic-book .screen-heading {
+  height: auto;
+  min-height: 72px;
+  padding: 12px 36px 10px;
+}
+.organic-book .screen-heading h2 {
+  font-size: 32px;
+}
+.organic-book .skill-points b {
+  font-size: 36px;
+}
+
+/* --- Legibilidade: textos secundários menos apagados --- */
+.organic-branch {
+  color: #46563f;
+}
+.organic-branch small {
+  font-size: 12px;
+  color: #4c5c46;
+}
+.foundation-label {
+  color: #55663f;
+}
+.tree-map-note {
+  font-size: 11px;
+  color: #47563f;
+}
+.skill-facts {
+  font-size: 13px;
+}
+.skill-facts dt {
+  color: #4c5a44;
+}
+.node-kind {
+  color: #5a6850;
+}
+.organic-tree .skill-node small {
+  font-size: 12px;
+}
+
+/* --- Inspetor: ação principal e dicas --- */
+.skill-equip {
+  width: 100%;
+  background: #405c48;
+  color: #eee5c4;
+  border: 1px solid #304c3b;
+  padding: 12px;
+  box-shadow: 1px 3px 4px #253c3222;
+  margin-top: 12px;
+}
+.skill-equip:disabled {
+  background: #c7c9ae;
+  color: #657158;
+  box-shadow: none;
+}
+.equip-hint {
+  font-size: 12px;
+  color: #4c5a44;
+  margin-top: 8px;
+}
+.equip-status {
+  font-size: 13px;
+  font-weight: bold;
+  margin-top: 10px;
+}
+.equip-blocked, .replace-prompt {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #6e4a35;
+  background: #d9cfae;
+  border: 1px solid #a08c5a;
+  padding: 8px 10px;
+  margin-top: 10px;
+}
+.replace-prompt {
+  font-weight: bold;
+}
+.linklike {
+  background: transparent;
+  border: 0;
+  padding: 6px 4px;
+  color: #4c5a44;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-size: 12px;
+}
+.linklike:hover {
+  filter: none;
+  color: #2e4336;
+}
+
+/* --- Carregamento: quatro placas compactas no inspetor --- */
+.loadout-dock {
+  margin-top: 16px;
+  border-top: 1px solid #a4aa88;
+  padding-top: 12px;
+}
+.loadout-dock h4 {
+  margin: 0 0 8px;
+  font: bold 12px Georgia, serif;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #55634a;
+}
+.loadout-slots {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.loadout-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 2px 6px;
+  background: #d4d2b2;
+  border: 1px solid #7d8566;
+  box-shadow: 1px 2px 0 #8b9275;
+  min-width: 0;
+}
+.loadout-slot kbd {
+  font: bold 12px Georgia, serif;
+  background: #344d42;
+  color: #f1e7c8;
+  border-radius: 3px;
+  padding: 1px 7px;
+  border: 1px solid #223528;
+}
+.loadout-slot .slot-icon svg {
+  width: 26px;
+  height: 26px;
+}
+.loadout-slot .slot-name {
+  font-size: 10.5px;
+  line-height: 1.2;
+  color: #2e4336;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.loadout-slot.empty {
+  background: transparent;
+  border-style: dashed;
+  border-color: #8b9275;
+  box-shadow: none;
+}
+.loadout-slot.empty .slot-name {
+  color: #6b7a5e;
+  font-style: italic;
+}
+.loadout-slot.current {
+  border-color: #725e34;
+  background: #c9bd8d;
+  box-shadow: 1px 2px 0 #725e34;
+}
+.loadout-dock.replacing .loadout-slot {
+  border-style: dashed;
+  border-color: #725e34;
+}
+.loadout-dock.replacing .loadout-slot:hover {
+  background: #c9bd8d;
+}
+@media(max-width:850px) {
+  .loadout-slot .slot-name {
+    display: none;
+  }
+}

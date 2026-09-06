@@ -1,8 +1,28 @@
-import type { Drop, Enemy } from "../core/types";
+import type { BiomeId, Drop, Enemy, Poi } from "../core/types";
 import { lootTableRegistry } from "../data/lootTables";
 import { enemyRegistry } from "../data/enemies";
 import { SeededRandom } from "../utils/SeededRandom";
 import { generateItem } from "./ItemGenerator";
+import { itemBaseRegistry } from "../data/items";
+import { poiDefinition } from "../data/pois";
+export function eligibleLootItems(tableId: string, level: number, biome?: BiomeId): string[] {
+  const table=lootTableRegistry[tableId];
+  if (!table) throw Error("Tabela de loot desconhecida");
+  return table.items.filter(id=>{
+    const base=itemBaseRegistry[id];
+    return base && (base.minLevel??1)<=level && (!biome || !base.biomes || base.biomes.includes(biome));
+  });
+}
+export function rollPoiLoot(poi: Poi, seed: string, level: number, biome: BiomeId, reward = 1): Drop[] {
+  const tableId=poiDefinition(poi)?.loot ?? "travel", table=lootTableRegistry[tableId];
+  const rng=new SeededRandom(`${seed}:site-loot:${poi.id}`), pool=eligibleLootItems(tableId,level,biome);
+  const drops: Drop[]=[{...poi,id:poi.id+":silver",kind:"silver",amount:Math.max(1,Math.ceil(table.silver*reward))}];
+  if (rng.next()<table.itemChance && pool.length)
+    drops.push({...poi,id:poi.id+":item",kind:"item",amount:1,item:generateItem(`${seed}:${poi.id}:item`,level,rng.pick(pool))});
+  if (rng.next()<table.jewelChance)
+    drops.push({...poi,id:poi.id+":jewel",kind:"jewel",amount:1,jewel:rng.pick(table.jewels)});
+  return drops;
+}
 export const lootBalance = {
   common: { silver: 0.16, equipment: 0.05, jewel: 0.002, gold: 0.006 },
   champion: { silver: 0.45, equipment: 0.16, jewel: 0.012, gold: 0.025 },
@@ -42,7 +62,8 @@ export function rollEnemyLoot(
       kind: "gold",
       amount: Math.ceil(multiplier),
     });
-  if (rng.next() < odds.equipment)
+  const pool=eligibleLootItems(enemyRegistry[enemy.definition].lootTable,enemy.level,enemy.biome);
+  if (rng.next() < odds.equipment && pool.length)
     drops.push({
       ...base,
       id: enemy.id + ":item",
@@ -51,7 +72,7 @@ export function rollEnemyLoot(
       item: generateItem(
         seed + ":loot:" + rng.next(),
         enemy.level,
-        rng.pick(table.items),
+        rng.pick(pool),
         enemy.elite ? 2 : undefined,
       ),
     });

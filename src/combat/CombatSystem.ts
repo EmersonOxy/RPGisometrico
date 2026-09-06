@@ -361,8 +361,12 @@ export class CombatSystem {
     if (target.hp <= 0) return;
     if (this.e.debugOptions.godMode && "classId" in target) return;
     const now = this.e.run.stats.seconds;
-    // Cooldown de dano tomado: ignora dano direto em rajada.
-    if (!periodic && (target.invulnUntil ?? 0) > now) return;
+    // Party protection prevents burst deaths; enemies must accept every arrow
+    // and simultaneous companion hit, including their on-hit effects.
+    if (!periodic && "classId" in target) {
+      if ((target.invulnUntil ?? 0) > now) return;
+    }
+    // Enemies retain the visual hurt flash without rejecting subsequent hits.
     if (!periodic) target.invulnUntil = now + CombatSystem.HURT_IFRAMES;
     const attacker = this.e.run.party.find((c) => c.id === source),
       critical = !!attacker && this.e.random.next() < statsFor(attacker).crit;

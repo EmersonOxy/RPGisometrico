@@ -63,6 +63,8 @@ export function poisFor(seed: string, cx: number, cy: number, version = 2, setti
   if (version >= 3) {
     const biome = sampleBiome(seed, x, y, settings);
     const candidates = Object.entries(poiRegistry).filter(([,p]) => p.biomes.includes(biome) && (Math.hypot(x,y)>45 || p.safe));
+    // Some biomes have no safe site near the starting area.
+    if (!candidates.length) return [];
     const [variant, def] = r.pick(candidates);
     // Keep footprints inside their owning chunk and away from adjacent sites.
     const px = cx * 32 + Math.max(7, Math.min(24, x-cx*32));
@@ -146,7 +148,10 @@ export function generateChunk(
       );
   if (version >= 3) {
     const chunk: Chunk = {key:cx+","+cy,cx,cy,tiles,pois,spawns};
-    populateChunk(seed, chunk, settings);
+    const nearbyPois: Poi[] = [];
+    for (let dy=-1;dy<=1;dy++) for (let dx=-1;dx<=1;dx++)
+      nearbyPois.push(...poisFor(seed,cx+dx,cy+dy,version,settings));
+    populateChunk(seed, chunk, settings, nearbyPois);
     chunk.ambient = ambientSpawns(seed, chunk);
     return chunk;
   }

@@ -32,11 +32,13 @@ export function createCharacter(
     x,
     y,
     alive: true,
-    points: 1,
+    points: Math.max(0,level-1),
     mastery: 0,
     passives: [],
     skillNodes: [],
-    loadout: [...classRegistry[classId].abilities],
+    loadout: ["", "", "", ""],
+    skillTreeVersion: 2,
+    skillPointsSpent: 0,
     equipment: {},
     jewels: [],
     cooldowns: {},
@@ -111,11 +113,12 @@ export function statsFor(c: Character): Stats {
   return s;
 }
 export function activeAbilities(c: Character) {
-  return (c.loadout ?? classRegistry[c.classId].abilities).slice(0,4).map((id) => {
+  return (c.loadout ?? ["", "", "", ""]).slice(0,4).map(id=>modifiedAbilityId(c,id));
+}
+export function modifiedAbilityId(c:Character,id:string) {
     for (const j of c.jewels)
       id = jewelRegistry[j]?.effectsByClass[c.classId]?.replace?.[id] ?? id;
     return id;
-  });
 }
 export function addExperience(c: Character, amount: number) {
   c.xp += amount;

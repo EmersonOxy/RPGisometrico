@@ -1,4 +1,8 @@
 import type { Save, MetaProgress, RunState } from "../core/types";
+import { worldSettings } from "../data/worldSettings";
+import { classRegistry } from "../data/classes";
+import { skillNodeRegistry } from "../data/skillTree";
+import { unlockedAbilities } from "../progression/SkillTree";
 export const defaultMeta = (): MetaProgress => ({
   silver: 45,
   gold: 2,
@@ -58,7 +62,7 @@ export function migrateSave(value: unknown): Save {
     wallet?: { silver: number; gold: number };
     unlockedClasses?: MetaProgress["unlockedClasses"];
   };
-  if (Number(v.schemaVersion ?? v.version ?? 1) > 4)
+  if (Number(v.schemaVersion ?? v.version ?? 1) > 6)
     throw Error("Save de versão mais recente");
   const meta = { ...defaultMeta(), ...v.meta };
   meta.settings = { ...defaultMeta().settings, ...v.meta?.settings };
@@ -73,6 +77,8 @@ export function migrateSave(value: unknown): Save {
     if (!Array.isArray(run.party) || typeof run.seed !== "string")
       throw Error("Expedição inválida");
     run.worldVersion ??= 1;
+    // Keep the saved generator version and seed: migration must not remake maps.
+    run.worldSettings = worldSettings(run.worldSettings);
     run.cartography ??= {};
     run.drops ??= [];
     run.deltas ??= {};
@@ -83,6 +89,33 @@ export function migrateSave(value: unknown): Save {
     run.jewels ??= [];
     run.ended ??= !run.party.some((c) => c.alive);
     for (const c of run.party) {
+      if (!c || !Object.hasOwn(classRegistry,c.classId)) throw Error("Classe inválida no save");
+      c.passives = Array.isArray(c.passives) ? c.passives : [];
+      c.skillNodes = [...new Set((Array.isArray(c.skillNodes) ? c.skillNodes : [])
+        .filter(id => Object.hasOwn(skillNodeRegistry,id) && skillNodeRegistry[id].classId === c.classId))];
+      const legacy=c.skillTreeVersion!==2;
+      if(legacy) {
+        // The old base kit was free. Keep it, and refund rewritten upgrades.
+        for(let i=0;i<4;i++) if(!c.skillNodes.includes(c.classId+":foundation:"+i))c.skillNodes.push(c.classId+":foundation:"+i);
+        const rewritten=c.skillNodes.filter(id=>id.includes(":upgrade:"));
+        c.points+=rewritten.length;
+        c.skillNodes=c.skillNodes.filter(id=>!rewritten.includes(id));
+        c.skillTreeVersion=2;
+      }
+      c.skillPointsSpent ??= c.skillNodes.reduce((sum,id)=>sum+(skillNodeRegistry[id]?.cost??0),0);
+      const unlocked = unlockedAbilities(c);
+      const slots = Array.isArray(c.loadout) ? c.loadout : legacy ? classRegistry[c.classId].abilities : [];
+      const seen = new Set<string>();
+      const normalized = Array.from({length:4},(_,i) => {
+        const id=slots[i];
+        if (!unlocked.includes(id) || seen.has(id)) return undefined;
+        seen.add(id); return id;
+      });
+      c.loadout = normalized.map(id => {
+        if (id) return id;
+        const fallback=legacy ? unlocked.find(a=>!seen.has(a)) ?? "" : "";
+        seen.add(fallback); return fallback;
+      });
       c.statPoints ??= Math.max(0, c.level - 1);
       c.allocatedStats ??= {
         vitality: 0,
@@ -96,7 +129,7 @@ export function migrateSave(value: unknown): Save {
       c.facingAngle ??= 0;
     }
   }
-  return { schemaVersion: 4, meta, run: run?.ended ? null : run };
+  return { schemaVersion: 6, meta, run: run?.ended ? null : run };
 }
 export class SaveRepository {
   private db?: IDBDatabase;
@@ -129,7 +162,7 @@ export class SaveRepository {
           resolve(
             req.result
               ? migrateSave(req.result)
-              : { schemaVersion: 3, meta: defaultMeta(), run: null },
+              : { schemaVersion: 6, meta: defaultMeta(), run: null },
           );
         } catch (e) {
           reject(e);
@@ -140,7 +173,7 @@ export class SaveRepository {
   }
   save(meta: MetaProgress, run: RunState | null): Promise<void> {
     const snapshot: Save = structuredClone({
-      schemaVersion: 4,
+      schemaVersion: 6,
       meta,
       run: run?.ended ? null : run,
     });

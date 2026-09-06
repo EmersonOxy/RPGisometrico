@@ -130,20 +130,13 @@ test("painéis, mochila, encaixes, árvore, atlas e escala em três resoluções
     ),
   ).toBe(swordId);
   await page.keyboard.press("k");
-  const points = await page.evaluate(
-    () => (window as any).__game.engine.selected.points,
-  );
-  await page
-    .locator(".skill-node.available[data-action=passive]")
-    .first()
-    .click();
-  expect(
-    await page.evaluate(() => (window as any).__game.engine.selected.points),
-  ).toBe(points - 1);
-  await expect(
-    page.locator(".skill-node.unlocked[data-action=passive]"),
-  ).toHaveCount(1);
-  await expect(page.locator(".jewel-gated.unlocked")).toHaveCount(1);
+  await page.evaluate(async()=>{const e=(window as any).__game.engine;const {addExperience}=await import('/src/progression/Character.ts');const {xpRequiredForLevel}=await import('/src/data/balance.ts');addExperience(e.selected,xpRequiredForLevel(e.selected.level));e.bus.emit('changed');});
+  const points=await page.evaluate(()=>(window as any).__game.engine.selected.points);
+  await page.locator('.skill-learn').click();
+  expect(await page.evaluate(()=>(window as any).__game.engine.selected.points)).toBe(points-1);
+  await expect(page.locator('.skill-inspector .skill-state')).toHaveText('✓ Aprendido');
+  await page.locator('[data-action=tree-equip][data-id="heavy"]').click();
+  await expect(page.locator('.skill-inspector h3')).toHaveText('Talho de brasa');
   const tree = page.locator(".tree-world"),
     before = await tree.getAttribute("style");
   await page.mouse.move(810, 510);

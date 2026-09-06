@@ -170,6 +170,7 @@ export function skillsPanel(c: Character) {
     activeAbilities(c)
       .map((id, i) => {
         const a = abilityRegistry[id];
+        if(!a)return '<article><small>Slot '+(i+1)+'</small><h3>Vazio</h3><p>Desbloqueie uma habilidade na árvore.</p></article>';
         return (
           '<article><span class="skill-icon">' +
           a.icon +

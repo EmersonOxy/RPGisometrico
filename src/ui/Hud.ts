@@ -12,6 +12,10 @@ import { drawMinimap } from "./Minimap";
 import { enemyRegistry } from "../data/enemies";
 import { bindingLabel, formatKeyBinding, type InputAction } from "../core/InputManager";
 
+// Ícone pixel-art do ataque básico (slot M2) em todas as classes.
+const basicAttackIcon =
+  new URL("../../assets/sprite/ui/icons/icon_ataque_basico.png", import.meta.url).href;
+
 export function hudMarkup() {
   return (
     '<div class="hud"><header class="world-header">' +
@@ -178,6 +182,7 @@ export function refreshHud(e: Engine) {
     "actions",
     [-1, 0, 1, 2, 3]
       .map((slot) => {
+        if (slot>=0 && !activeAbilities(c)[slot]) return '<button class="ability empty-skill" data-action="skills" aria-label="Slot '+(slot+1)+' vazio · abrir disciplinas"><span class="skill-face">'+icon('lock')+'</span><kbd>'+bindingLabel(e.meta.settings,`ABILITY_${slot+1}` as InputAction)+'</kbd></button>';
         const a =
             abilityRegistry[
               slot < 0
@@ -208,7 +213,9 @@ export function refreshHud(e: Engine) {
           (slot < 0 ? "Ataque Básico: " : "") +
           a.name +
           '"><span class="skill-face">' +
-          icon(a.id) +
+          (slot < 0
+            ? '<img class="basic-icon" src="' + basicAttackIcon + '" alt="" draggable="false">'
+            : icon(a.id)) +
           '</span><span class="radial-cooldown" style="--cooldown:' +
           percent +
           "%;opacity:" +
@@ -311,7 +318,7 @@ export function refreshHud(e: Engine) {
       : !e.meta.tutorials.inventory && e.run.inventory.length
         ? `<p>Um novo achado · ${invKey} abre sua mochila.</p>`
         : !e.meta.tutorials.skill && e.run.stats.kills === 0
-          ? `<p>${a1} ${a2} ${a3} ${a4} · disciplinas · Mouse 2 para ataque básico.</p>`
+          ? `<p>Mouse 2 para atacar · Suba de nível e abra Disciplinas (${bindingLabel(e.meta.settings,"SKILLS")}) para aprender sua primeira habilidade.</p>`
           : "",
   );
 }

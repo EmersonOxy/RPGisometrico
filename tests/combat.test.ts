@@ -1,3 +1,4 @@
+import { giveTestKit } from "./skill-fixtures";
 import { afterEach, describe, it, expect } from "vitest";
 import { Engine } from "../src/core/Engine";
 import { EventBus } from "../src/core/EventBus";
@@ -15,7 +16,7 @@ function setup(cls: ClassId = "fighter") {
   const m = defaultMeta(),
     r = newRun("qa", cls, m),
     e = new Engine(r, m, new EventBus(), async () => {});
-  engines.push(e);
+  engines.push(e); giveTestKit(e.selected);
   e.selected.x = 20;
   e.selected.y = 0.5;
   return e;
@@ -178,7 +179,7 @@ describe("Combate real sem renderer", () => {
     e.combat.hit("enemy", c, 30);
     expect(hp - c.hp).toBeLessThan(normal * 0.5);
   });
-  it("dano direto abre cooldown, empurra e DoT periódico passa direto", () => {
+  it("inimigos mantêm recuo e brilho de dano sem perder golpes consecutivos", () => {
     const e = setup(), t = enemy(e);
     const x0 = t.x;
     e.combat.hit(e.selected.id, t, 20);
@@ -190,7 +191,7 @@ describe("Combate real sem renderer", () => {
     expect(t.statuses.some((s) => s.id === "stun")).toBe(false);
     expect(t.invulnUntil ?? 0).toBeGreaterThan(e.run.stats.seconds);
     e.combat.hit(e.selected.id, t, 20);
-    expect(t.hp).toBe(afterFirst);
+    expect(t.hp).toBeLessThan(afterFirst);
     moveEntities(e, 0.5);
     expect(t.x).toBeGreaterThan(x0); // knockback suave concluiu o empurrão
     e.combat.statuses(t, 0.5);

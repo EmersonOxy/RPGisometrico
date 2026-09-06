@@ -1,4 +1,4 @@
-import { rollEnemyLoot, mergeCoins } from "../loot/LootSystem";
+import { rollEnemyLoot, rollPoiLoot, mergeCoins } from "../loot/LootSystem";
 import { summarizeChunk } from "../world/Cartography";
 import type {
   Character,
@@ -40,6 +40,7 @@ import { worldSettings, difficultyRegistry, populationBalance } from "../data/wo
 import { tickAmbient } from "../entities/AmbientAI";
 import { ambientRegistry } from "../data/ambient";
 import { poiDefinition } from "../data/pois";
+import { skillNodeRegistry } from "../data/skillTree";
 import { learnSkill, equipAbility } from "../progression/SkillTree";
 export class Engine {
   canChangeLoadout() {
@@ -436,7 +437,9 @@ export class Engine {
             void this.save();
             this.bus.emit("notice", "Marcador pessoal adicionado ao atlas.");
           } else if (cmd.kind === "investigate") {
-            const poi = [...this.world.chunks.values()].flatMap(ch=>ch.pois).filter(p=>distance(p,cmd.point)<3).sort((a,b)=>distance(a,cmd.point)-distance(b,cmd.point))[0];
+            const candidates: (Point & {id:string})[] = [...this.world.chunks.values()].flatMap(ch=>ch.pois);
+            candidates.push(...[...this.ambient.values()].filter(a=>a.kind==="npc"));
+            const poi = candidates.filter(p=>distance(p,cmd.point)<3).sort((a,b)=>distance(a,cmd.point)-distance(b,cmd.point))[0];
             if(poi) this.orderMove(this.commandMembers(), poi, "investigate", poi.id);
             this.bus.emit("notice", poi ? "A caminho da interação." : "Área marcada para investigar.");
           }
@@ -502,20 +505,13 @@ export class Engine {
           this.shop.recruit(cmd.classId);
           break;
         case "mastery":
-          if (c.points > 0) {
-            c.points--;
-            c.mastery++;
-          }
+          throw Error("Aprenda os nós de maestria na árvore de disciplinas.");
           break;
         case "passive":
-          if (
-            c.points > 0 &&
-            !c.passives.includes(cmd.id) &&
-            classRegistry[c.classId].passives.includes(cmd.id)
-          ) {
-            c.points--;
-            c.passives.push(cmd.id);
-          }
+          { const node=Object.values(skillNodeRegistry).find(n=>n.classId===c.classId&&n.passive===cmd.id);
+            if(!node)throw Error("Talento desconhecido");
+            if(!this.canChangeLoadout())throw Error("Aprenda disciplinas fora de combate.");
+            learnSkill(c,node.id); }
           break;
       }
       this.bus.emit("changed", undefined);
@@ -546,7 +542,9 @@ export class Engine {
   interact(id: string, actor = this.selected) {
     const npc=this.ambient.get(id);
     if(npc?.kind==="npc") {
-      if(distance(actor,npc)>3){this.move(actor,npc);this.bus.emit("notice","Aproxime-se e use Explorar novamente para conversar.");return;}
+      if (!actor.alive) return;
+      if(distance(actor,npc)>3){this.orderMove([actor],npc,"investigate",id);this.bus.emit("notice","A caminho da conversa…");return;}
+      this.orders.delete(actor.id); actor.path=[];
       const def=ambientRegistry[npc.definition], b=this.world.cell(Math.floor(npc.x),Math.floor(npc.y)).biome;
       const lines=def.dialogue ?? [];
       this.bus.emit("notice",`${def.name}: ${lines[npc.step % lines.length] ?? "Boa viagem."} (${b})`);
@@ -569,8 +567,12 @@ export class Engine {
     const site=poiDefinition(poi);
     if(site && !this.run.deltas[id+":discovered"]) {
       this.run.deltas[id+":discovered"]=true;
-      for(const member of this.run.party) if(member.alive)addExperience(member,site.discoveryXp);
+      for(const member of this.run.party) if(member.alive) {
+        addExperience(member,site.discoveryXp);
+        this.run.stats.highestLevel=Math.max(this.run.stats.highestLevel,member.level);
+      }
       this.bus.emit("notice",`${site.name} descoberto · ${site.discoveryXp} XP de exploração`);
+      void this.save();
     }
     if (poi.kind === "merchant") {
       this.shop.active = id;
@@ -613,6 +615,14 @@ export class Engine {
     }
     if (this.run.deltas[id]) return;
     this.run.deltas[id] = true;
+    if (site) {
+      const biome=sampleBiome(this.run.seed,poi.x,poi.y,this.run.worldSettings);
+      const level=regionLevel(poi.x,poi.y);
+      this.run.drops.push(...rollPoiLoot(poi,this.run.seed,level,biome,difficultyRegistry[this.run.worldSettings!.difficulty].reward));
+      this.bus.emit("notice","Local explorado. Aproxime-se para recolher os achados.");
+      void this.save();
+      return;
+    }
       this.run.drops.push(
         {
           ...poi,
@@ -661,7 +671,7 @@ export class Engine {
         const member = this.run.party.find(m=>m.id===id && m.alive);
         task.remaining -= dt;
         if(!member || task.remaining<=0){if(member)member.target=undefined;this.orders.delete(id);continue;}
-        if(task.kind==="investigate" && task.poi){const poi=[...this.world.chunks.values()].flatMap(ch=>ch.pois).find(p=>p.id===task.poi);if(poi && distance(member,poi)<=1.7){this.orders.delete(id);this.interact(poi.id,member);continue;}}
+        if(task.kind==="investigate" && task.poi){const npc=this.ambient.get(task.poi);const poi=npc?.kind==="npc" ? npc : [...this.world.chunks.values()].flatMap(ch=>ch.pois).find(p=>p.id===task.poi);if(poi && distance(member,poi)<=(npc?.kind==="npc"?3:1.7)){this.orders.delete(id);this.interact(poi.id,member);continue;}}
         if(task.kind==="attack" && !member.path.length){const enemy=this.nearestEnemy(task.point,5);if(enemy){member.target=enemy.id;if(distance(member,enemy)>classRegistry[member.classId].range)this.approach(member,enemy,classRegistry[member.classId].range);else this.combat.cast(member,-1);}continue;}
         if(task.kind==="defend" && !member.path.length){const enemy=this.nearestEnemy(member,classRegistry[member.classId].range);member.target=enemy?.id;if(enemy)this.combat.cast(member,-1);continue;}
         if(task.kind==="move" && !member.path.length) this.orders.delete(id);
@@ -882,7 +892,7 @@ export class Engine {
         enemy,
         this.run.seed,
         this.random,
-        coinMultiplier(this.run.party, enemy),
+        coinMultiplier(this.run.party, enemy) * difficultyRegistry[this.run.worldSettings!.difficulty].reward,
       ),
     );
     this.run.drops = mergeCoins(this.run.drops);
