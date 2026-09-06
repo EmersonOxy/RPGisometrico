@@ -247,7 +247,7 @@ export function refreshHud(e: Engine) {
       }
     }
   }
-  const biome = biomeRegistry[sampleBiome(e.run.seed, c.x, c.y)];
+  const biome = biomeRegistry[sampleBiome(e.run.seed, c.x, c.y, e.run.worldSettings)];
   document.getElementById("biome")!.textContent = biome.name;
   document.getElementById("region")!.textContent =
     "Região " + regionLevel(c.x, c.y, biome.danger);

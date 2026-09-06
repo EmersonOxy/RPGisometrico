@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { createFoliage } from "./Foliage";
+import { createAmbientTextures } from "./AmbientTextures";
 function texture(
   scene: Phaser.Scene,
   key: string,
@@ -27,6 +28,7 @@ const poly = (
   );
 };
 export function createTextures(scene: Phaser.Scene) {
+  createAmbientTextures(scene);
   createFoliage(scene);
   for (const [id, color] of Object.entries({
     fighter: 0xb87358,

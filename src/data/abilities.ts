@@ -20,6 +20,13 @@ export type TargetMode =
   | "AOE_AROUND_SELF";
 
 export interface AbilityDefinition {
+  cone?: number;
+  spread?: number;
+  delay?: number;
+  executeBelow?: number;
+  healthCost?: number;
+  healFraction?: number;
+  selfStatus?: StatusId;
   id: string;
   name: string;
   icon: string;
@@ -210,5 +217,21 @@ export const abilityRegistry: Record<string, AbilityDefinition> =
         description:
           "Fire Jewel: corte físico + fogo e queimadura por 4 segundos. Em alvo lento, ativa choque térmico: consome ambos os efeitos, +35% de dano no golpe e metade da armadura por 2 s.",
       }),
+      a("rend","Ferida aberta","⚔","melee",2,1.4,5,16,{status:"bleed",description:"Corte que sangra por 4 s. Pressiona um alvo mesmo durante o reposicionamento."}),
+      a("execute","Sentença","⚔","melee",2,1.8,8,25,{executeBelow:.35,windup:.4,description:"Causa o dobro do dano contra inimigos abaixo de 35% da vida."}),
+      a("cleave","Arco de ferro","⚔","area",3.5,2.2,6,22,{target:"DIRECTION",cone:100,description:"Varre um cone de 100° diante do cursor. Maior alcance que Círculo de aço, mas exige direção."}),
+      a("bloodrush","Pacto rubro","♨","buff",0,0,14,10,{target:"SELF",status:"fury",selfStatus:"leech",duration:5,healthCost:.08,description:"Sacrifica 8% da vida máxima: ganha Ímpeto e recupera 15% do dano direto causado por 5 s."}),
+      a("pin","Flecha de inverno","➶","projectile",11,1.3,5,16,{status:"slow",description:"Desacelera um alvo distante; permite manter distância e preparar choque térmico."}),
+      a("snare","Laço de ferro","⌘","trap",7,1.2,10,24,{target:"GROUND",status:"stun",radius:1.4,delay:.7,description:"Armadilha estreita que atordoa após 0,7 s. Interrompe grupos concentrados."}),
+      a("fan","Leque de flechas","⋙","projectile",7,.65,7,26,{target:"DIRECTION",count:5,spread:.22,description:"Dispara cinco flechas em leque. Cobertura ampla, menor dano em alvo único."}),
+      a("snipe","Tiro de ruptura","⇢","projectile",13,3.4,10,30,{status:"armorBreak",windup:.65,description:"Preparação de 0,65 s e longo alcance; reduz a armadura do alvo por 4 s."}),
+      a("fireball","Orbe de brasa","♨","projectile",9,1.8,5,20,{status:"burn",tags:["MAGIC","FIRE"],color:0xef985b,description:"Projétil que queima por 4 s. Combine com frio para provocar choque térmico."}),
+      a("meteor","Estrela cadente","✦","trap",8,4,12,38,{target:"GROUND",status:"burn",radius:3,delay:1.8,windup:.4,tags:["MAGIC","FIRE"],color:0xef985b,description:"Marca uma área de raio 3; após 1,8 s, explode e queima. Grande impacto com preparação."}),
+      a("frostlance","Agulha glacial","❄","projectile",10,1.1,6,24,{pierce:true,status:"slow",tags:["MAGIC","FROST"],color:0xa5daed,description:"Perfura uma linha de inimigos e desacelera todos por 4 s."}),
+      a("ward","Véu prismático","⬡","buff",0,0,14,24,{target:"SELF",status:"guard",duration:3,description:"Reduz dano recebido em 65% durante 3 s; proteção curta para terminar uma conjuração."}),
+      a("shieldrush","Avanço do bastião","➤","dash",4,1.2,8,22,{target:"DIRECTION",selfStatus:"guard",duration:2,description:"Avança, atordoa o primeiro inimigo atingido e ganha guarda por 2 s."}),
+      a("riposte","Postura de resposta","⬡","buff",0,0,12,24,{target:"SELF",status:"guard",selfStatus:"riposte",duration:3,description:"Guarda por 3 s. Devolve 30% do dano base de golpes diretos ao agressor."}),
+      a("rally","Fôlego comum","⛨","protect",5,0,18,34,{target:"SELF",duration:2,healFraction:.08,description:"Restaura 8% da vida máxima dos aliados próximos e dá guarda por 2 s."}),
+      a("sunder","Quebra-couraça","⚔","melee",2.2,1.4,5,18,{status:"armorBreak",description:"Reduz a armadura de um alvo por 4 s; prepara o foco de dano do grupo."}),
     ].map((x) => [x.id, x]),
   );

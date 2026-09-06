@@ -15,7 +15,7 @@ export type Stat =
 export type Stats = Record<Stat, number>;
 export type Point = { x: number; y: number };
 export type StatusId =
-  "burn" | "slow" | "stun" | "armorBreak" | "guard" | "fury";
+  "burn" | "slow" | "stun" | "stagger" | "armorBreak" | "guard" | "fury" | "bleed" | "leech" | "riposte";
 export interface Status {
   id: StatusId;
   remaining: number;
@@ -52,6 +52,9 @@ export type StatPointType =
   | "charisma";
 
 export interface Character extends Point {
+  skillNodes?: string[];
+  loadout?: string[];
+  combatUntil?: number;
   id: string;
   classId: ClassId;
   name: string;
@@ -76,8 +79,20 @@ export interface Character extends Point {
   allocatedStats?: Record<StatPointType, number>;
   attackTime: number;
   aiTime: number;
+  /** Fim da invulnerabilidade pós-dano (relógio run.stats.seconds). */
+  invulnUntil?: number;
+  /** Velocidade de knockback em tiles/s (decai em moveEntities). */
+  knockX?: number;
+  knockY?: number;
 }
 export interface Enemy extends Point {
+  encounterId?: string;
+  biome?: BiomeId;
+  poiVariant?: string;
+  populationCost?: number;
+  ambientTime?: number;
+  ambientStep?: number;
+  alerted?: boolean;
   id: string;
   definition: string;
   level: number;
@@ -94,6 +109,13 @@ export interface Enemy extends Point {
   attackTime: number;
   home: Point;
   threat: Record<string, number>;
+  /** 0 = paleta normal; 1..n = variants da definição. */
+  variant?: number;
+  /** Fim da invulnerabilidade pós-dano (relógio run.stats.seconds). */
+  invulnUntil?: number;
+  /** Velocidade de knockback em tiles/s (decai em moveEntities). */
+  knockX?: number;
+  knockY?: number;
 }
 export interface Drop extends Point {
   id: string;
@@ -112,6 +134,7 @@ export interface RunStats {
   biomes: BiomeId[];
 }
 export interface RunState {
+  worldSettings?: import("../data/worldSettings").WorldGenerationSettings;
   id: string;
   seed: string;
   worldVersion?: number;
@@ -197,7 +220,7 @@ export interface MetaProgress {
   statistics: { runs: number; kills: number };
 }
 export interface Save {
-  schemaVersion: 3 | 4;
+  schemaVersion: 3 | 4 | 5;
   meta: MetaProgress;
   run: RunState | null;
 }
@@ -211,22 +234,45 @@ export interface Tile {
   variant: number;
 }
 export interface Poi extends Point {
+  variant?: string;
   id: string;
   kind: "merchant" | "shrine" | "ruin" | "chest" | "nest" | "elite";
 }
 export interface Spawn extends Point {
+  encounterId?: string;
+  biome?: BiomeId;
+  poiVariant?: string;
+  populationCost?: number;
   id: string;
   definition: string;
   level: number;
   elite: boolean;
+  /** 0 = paleta normal; 1..n = variants da definição. */
+  variant?: number;
 }
 export interface Chunk {
+  populationBudget?: number;
+  ambient?: AmbientSpawn[];
   key: string;
   cx: number;
   cy: number;
   tiles: Tile[];
   pois: Poi[];
   spawns: Spawn[];
+}
+export interface AmbientSpawn extends Point {
+  id: string;
+  definition: string;
+  kind: "fauna" | "npc";
+  biome: BiomeId;
+  poiId?: string;
+}
+export interface AmbientEntity extends AmbientSpawn {
+  home: Point;
+  destination?: Point;
+  state: "REST" | "GRAZE" | "WANDER" | "FLEE" | "TRAVEL";
+  timer: number;
+  step: number;
 }
 export interface Effect extends Point {
   id: number;
@@ -245,6 +291,8 @@ export interface Effect extends Point {
   radius: number;
   to?: Point;
   text?: string;
+  /** Direção do golpe no espaço do mundo (atacante → alvo). Usado pelo slash. */
+  angle?: number;
 }
 export interface Hazard extends Point {
   id: number;
@@ -270,6 +318,8 @@ export interface Projectile extends Point {
   status?: StatusId;
 }
 export type Command =
+  | { type: "skill"; id: string }
+  | { type: "loadout"; id: string; slot: number }
   | { type: "move"; point: Point; silent?: boolean }
   | { type: "target"; id: string }
   | { type: "ability"; slot: number; point?: Point }

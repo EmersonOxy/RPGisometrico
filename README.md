@@ -69,6 +69,8 @@ Ordens dos companheiros: seguir, manter posição, focar alvo do líder, passivo
 
 ## Sistemas jogáveis
 
+Revisão e refinamentos recentes: [combate, sprites e validação de 05/09/2026](docs/REVISAO-2026-09-05.md). Queimadura + lentidão agora ativam choque térmico: +35% de dano no golpe, consumo dos dois efeitos e metade da armadura por 2 segundos.
+
 - Quatro classes: Lutador, Atirador, Feiticeiro e Bastião (Tank), cada qual com básico, quatro ativas, três talentos e maestria repetível.
 - Seis comportamentos inimigos: perseguidor, arqueiro que recua, investidor com antecipação, caçador de matilha, conjurador de área e guardião lento.
 - Combate com projéteis físicos, áreas, investida, buffs, ameaça, guarda compartilhada, críticos, Burn, Slow e Stun.

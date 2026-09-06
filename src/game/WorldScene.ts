@@ -143,6 +143,7 @@ export class WorldScene extends Phaser.Scene {
   preload() {
     loadPlayerSheets(this);
     loadEnemySheets(this);
+    this.load.image("attack-melee", new URL("../../assets/sprite/ui/combat/attack_melee.png", import.meta.url).href);
   }
 
   create() {
@@ -431,7 +432,13 @@ export class WorldScene extends Phaser.Scene {
       }
     }
 
-    if (!e.hovered) {
+      if (!e.hovered) {
+        for(const npc of e.ambient.values()) {
+          const p=worldToIso(npc);
+          if(npc.kind==="npc"&&Math.hypot((point.x-p.x)/20,(point.y-p.y+32)/35)<1){e.hovered={kind:"poi",id:npc.id};break;}
+        }
+      }
+      if (!e.hovered) {
       const drop = this.actors?.hitDrop(point);
       const poi = this.terrain?.hitPoi(point);
       if (drop) e.hovered = { kind: "drop", id: drop };

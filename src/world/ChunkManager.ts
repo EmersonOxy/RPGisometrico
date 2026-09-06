@@ -2,6 +2,7 @@ import type { Chunk, Point } from "../core/types";
 import { balance } from "../data/balance";
 import { chunkAt, chunkKey } from "./WorldCoordinates";
 import { generateChunk, sampleTile } from "./generation/WorldGenerator";
+import { defaultWorldSettings } from "../data/worldSettings";
 export class ChunkManager {
   chunks = new Map<string, Chunk>();
   pending = new Set<string>();
@@ -13,6 +14,7 @@ export class ChunkManager {
     private onLoad: (chunk: Chunk) => void,
     private onUnload: (key: string) => void,
     private version = 2,
+    public settings = defaultWorldSettings,
   ) {
     try {
       if (typeof Worker !== "undefined") {
@@ -26,7 +28,7 @@ export class ChunkManager {
           this.worker = undefined;
           for (const key of [...this.pending]) {
             const [cx, cy] = key.split(",").map(Number);
-            this.accept(generateChunk(seed, cx, cy, this.version));
+            this.accept(generateChunk(seed, cx, cy, this.version, this.settings));
           }
         };
       }
@@ -65,11 +67,12 @@ export class ChunkManager {
               cx,
               cy,
               version: this.version,
+              settings: this.settings,
             });
           else
             setTimeout(() => {
               if (!this.disposed)
-                this.accept(generateChunk(this.seed, cx, cy, this.version));
+                this.accept(generateChunk(this.seed, cx, cy, this.version, this.settings));
             }, 0);
         }
     for (const [key, c] of this.chunks)
@@ -91,7 +94,7 @@ export class ChunkManager {
         (y - c.y * balance.chunkSize) * balance.chunkSize +
           x -
           c.x * balance.chunkSize
-      ] ?? sampleTile(this.seed, x, y, undefined, this.version)
+      ] ?? sampleTile(this.seed, x, y, undefined, this.version, this.settings)
     );
   };
   destroy() {

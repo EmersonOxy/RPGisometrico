@@ -285,6 +285,10 @@ input[type="range"] {
   height: 102px;
   transform: translate(-5px, -10px);
 }
+/* Retratos pixel-art (lutador/atirador 32x32): amplia sem suavizar. */
+.hero-portrait image {
+  image-rendering: pixelated;
+}
 .portrait-body {
   flex: 1;
 }
@@ -2613,3 +2617,17 @@ body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::aft
   opacity: 0.75;
   text-transform: uppercase;
 }
+
+/* Expedition choices and expanded disciplines retain the parchment UI. */
+.expedition-settings, .loadout-bar {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0;}
+.expedition-settings label, .loadout-bar label {display:flex;flex-direction:column;gap:5px;font-size:13px;min-width:0;}
+.expedition-settings select, .loadout-bar select {width:100%;padding:8px;background:#d9d5b9;color:#293c32;border:1px solid #8b9275;border-radius:3px;}
+.loadout-bar {grid-template-columns:repeat(4,minmax(0,1fr));margin:8px 24px;}
+.loadout-rule {font-size:12px;text-align:center;margin:0 0 5px;}
+.tree-world.expanded-tree {width:1100px;height:1000px;margin-left:-550px;margin-top:-500px;}
+.expanded-tree .tree-connections {width:1100px;height:1000px;}
+.expanded-tree .skill-node {width:230px;}
+.expanded-tree .node-medallion {width:50px;height:50px;}
+.expanded-tree .skill-node b {font-size:24px;}
+.discipline-branch {position:absolute;transform:translateX(-50%);font:italic 26px Georgia;color:#536449;}
+@media(max-height:800px){.selection-sheet{padding:16px}.selection-sheet .class-banner{padding:12px}.expedition-settings{margin:8px 0;}}

@@ -5,7 +5,9 @@ import { defaultMeta } from "../src/persistence/SaveRepository";
 import { newRun } from "../src/core/Run";
 import { createCharacter, statsFor } from "../src/progression/Character";
 import { enemyRegistry } from "../src/data/enemies";
-import { tickAI } from "../src/entities/AI";
+import { tickAI, moveEntities } from "../src/entities/AI";
+import { PlayerAnimation } from "../src/rendering/PlayerSprites";
+import { EnemyAnimation } from "../src/rendering/EnemySprites";
 import type { ClassId, Enemy } from "../src/core/types";
 const engines: Engine[] = [];
 afterEach(() => engines.splice(0).forEach((e) => e.destroy()));
@@ -48,10 +50,12 @@ describe("Combate real sem renderer", () => {
       e.random.next = () => 1;
       e.combat.hit(e.selected.id, t, 20, first);
       const hp = t.hp;
+      e.run.stats.seconds += 1;
       e.combat.hit(e.selected.id, t, 20, second);
       expect(hp - t.hp).toBe(26);
+      e.combat.statuses(t, 0.5); // expira o stun do knockback, mantém o resto
       expect(t.statuses.map(s => s.id)).toEqual(["armorBreak"]);
-      expect(t.statuses[0].remaining).toBe(2);
+      expect(t.statuses[0].remaining).toBeCloseTo(1.5);
       expect(e.effects.some(f => f.text === "Choque térmico")).toBe(true);
       e.combat.statuses(t, 2.1);
       expect(t.statuses).toEqual([]);
@@ -170,8 +174,67 @@ describe("Combate real sem renderer", () => {
     c.hp = hp;
     e.combat.cast(c, 3);
     e.combat.update(0.3);
+    e.run.stats.seconds += 1;
     e.combat.hit("enemy", c, 30);
     expect(hp - c.hp).toBeLessThan(normal * 0.5);
+  });
+  it("dano direto abre cooldown, empurra e DoT periódico passa direto", () => {
+    const e = setup(), t = enemy(e);
+    const x0 = t.x;
+    e.combat.hit(e.selected.id, t, 20);
+    const afterFirst = t.hp;
+    expect(afterFirst).toBeLessThan(1000);
+    expect(t.x).toBe(x0); // deslocamento é animado, não teleporte
+    expect(t.knockX ?? 0).toBeGreaterThan(0);
+    expect(t.statuses.some((s) => s.id === "stagger")).toBe(true);
+    expect(t.statuses.some((s) => s.id === "stun")).toBe(false);
+    expect(t.invulnUntil ?? 0).toBeGreaterThan(e.run.stats.seconds);
+    e.combat.hit(e.selected.id, t, 20);
+    expect(t.hp).toBe(afterFirst);
+    moveEntities(e, 0.5);
+    expect(t.x).toBeGreaterThan(x0); // knockback suave concluiu o empurrão
+    e.combat.statuses(t, 0.5);
+    expect(t.statuses.some((s) => s.id === "stagger")).toBe(false);
+    e.run.stats.seconds += 1;
+    e.combat.hit(e.selected.id, t, 20);
+    expect(t.hp).toBeLessThan(afterFirst);
+    const hp = t.hp;
+    e.combat.hit(e.selected.id, t, 20, undefined, 0xe8c692, true);
+    expect(t.hp).toBeLessThan(hp);
+  });
+  it("knockback não vira o personagem para a direção do empurrão", () => {
+    const e = setup();
+    const c = e.selected;
+    c.facingAngle = Math.PI;
+    const a = new PlayerAnimation(c);
+    const first = a.update(c, 0.1, false, false);
+    c.knockX = 4;
+    c.knockY = 0;
+    c.x += 0.06;
+    const knocked = a.update(c, 0.016, false, false);
+    expect(knocked.frame).toBe(first.frame);
+    expect(knocked.mode).toBe("idle");
+    c.knockX = 0;
+    c.knockY = 0;
+    c.x += 0.06;
+    const walking = a.update(c, 0.016, false, false);
+    expect(walking.mode).toBe("walk");
+    expect(walking.frame.split(":")[0]).toBe("3");
+  });
+  it("knockback não vira o inimigo para a direção do empurrão", () => {
+    const e = setup(), t = enemy(e);
+    const a = new EnemyAnimation(t);
+    a.update(t, 0.1, false, false);
+    t.knockX = 4;
+    t.knockY = 0;
+    t.x += 0.06;
+    const knocked = a.update(t, 0.016, false, false)!;
+    expect(knocked.frame.split(":")[0]).toBe("4");
+    t.knockX = 0;
+    t.knockY = 0;
+    t.x += 0.06;
+    const walking = a.update(t, 0.016, false, false)!;
+    expect(walking.frame.split(":")[0]).toBe("3");
   });
 });
 describe("Seis decisões de IA", () => {

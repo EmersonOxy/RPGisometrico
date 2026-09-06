@@ -2,15 +2,17 @@ import type { ClassId, MetaProgress, RunState } from "./types";
 import { createCharacter } from "../progression/Character";
 import { hash } from "../utils/SeededRandom";
 import { defaultMeta } from "../persistence/SaveRepository";
-export function freshGame(seed: string, previous: MetaProgress) {
+import { worldSettings, type WorldGenerationSettings } from "../data/worldSettings";
+export function freshGame(seed: string, previous: MetaProgress, settings?: WorldGenerationSettings) {
   const meta = defaultMeta();
   meta.settings = structuredClone(previous.settings);
-  return { meta, run: newRun(seed, "fighter", meta) };
+  return { meta, run: newRun(seed, "fighter", meta, settings) };
 }
 export function newRun(
   seed: string,
   classId: ClassId,
   meta: MetaProgress,
+  settings?: WorldGenerationSettings,
 ): RunState {
   if (!meta.unlockedClasses.length) meta.unlockedClasses.push(classId);
   if (!meta.unlockedClasses.includes(classId))
@@ -21,7 +23,8 @@ export function newRun(
   return {
     id,
     seed,
-    worldVersion: 2,
+    worldVersion: 3,
+    worldSettings: worldSettings(settings),
     cartography: {},
     party: [c],
     selected: c.id,

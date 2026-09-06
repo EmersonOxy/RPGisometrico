@@ -11,7 +11,11 @@ import { PlayerAnimation, playerFrameRegistration } from "./PlayerSprites";
 import { EnemyAnimation, enemyFrameRegistration } from "./EnemySprites";
 import { enemySpriteConfig } from "./EnemySpriteConfig";
 import { playerSpriteConfig } from "./PlayerSpriteConfig";
+import { ambientRegistry } from "../data/ambient";
+import { isStunned } from "../combat/DamageSystem";
 export class EntityRenderer {
+  private ambientSprites = new Map<string, Phaser.GameObjects.Image>();
+  private ambientLabels = new Map<string, Phaser.GameObjects.Text>();
   private dropLabels = new Map<string, Phaser.GameObjects.Text>();
   private sprites = new Map<string, Phaser.GameObjects.Image>();
   private playerAnimations = new Map<string, PlayerAnimation>();
@@ -22,6 +26,7 @@ export class EntityRenderer {
   private groundOverlay: Phaser.GameObjects.Graphics;
   private overlay: Phaser.GameObjects.Graphics;
   private effectLabels = new Map<number, Phaser.GameObjects.Text>();
+  private slashSprites = new Map<number, Phaser.GameObjects.Image>();
   private damageTrails = new Map<string, { trailHp: number; timer: number }>();
   private altIndicatorAlpha = 0;
   private lastTime = 0;
@@ -43,6 +48,9 @@ export class EntityRenderer {
     this.shadowOverlay = scene.add.graphics().setDepth(5);
     this.groundOverlay = scene.add.graphics().setDepth(10);
     this.overlay = scene.add.graphics().setDepth(100000);
+    // Pixel-art do golpe melee: ampliar sem suavizar.
+    if (scene.textures.exists("attack-melee"))
+      scene.textures.get("attack-melee").setFilter(Phaser.Textures.FilterMode.NEAREST);
   }
   update(time: number) {
     const dt = this.lastTime ? Math.min(0.1, (time - this.lastTime) / 1000) : 0.016;
@@ -52,6 +60,34 @@ export class EntityRenderer {
     this.shadowOverlay.clear();
     this.groundOverlay.clear();
     this.overlay.clear();
+    // Menor depth entre as sprites desenhadas neste frame. Sombras e anéis
+    // de chão são ancorados abaixo dela (ver fim do loop de entidades).
+    let lowestDepth = Infinity;
+    for(const a of this.e.ambient.values()) {
+      const def=ambientRegistry[a.definition],p=worldToIso(a);
+      let sprite=this.ambientSprites.get(a.id);
+      if(!sprite){sprite=this.scene.add.image(0,0,def.texture).setOrigin(.5,.92);this.ambientSprites.set(a.id,sprite);}
+      const visible=Math.hypot(a.x-this.e.selected.x,a.y-this.e.selected.y)<26;
+      const bob=this.e.meta.settings.reducedMotion||this.e.paused||this.e.tactical?0:Math.sin(time*.006+a.home.x)*2;
+      sprite.setPosition(p.x,p.y-(def.flying?38+bob:0)).setDepth(p.y+(def.flying?40:0)).setVisible(visible);
+      // Gangorra ao se deslocar (fauna e NPCs passivos), igual às tropas.
+      sprite.setRotation(
+        a.destination && !this.e.meta.settings.reducedMotion && !this.e.paused && !this.e.tactical
+          ? Math.sin(time * 0.016 + a.home.x) * 0.07
+          : 0,
+      );
+      if (visible) lowestDepth = Math.min(lowestDepth, p.y + (def.flying ? 40 : 0));
+      sprite.setScale(a.definition==="hare"?.55:a.definition==="fox"?.8:1);
+      if(a.destination)sprite.setFlipX(a.destination.x-a.destination.y<a.x-a.y);
+      if(def.kind==="npc") {
+        sprite.setTint(def.color);
+        let label=this.ambientLabels.get(a.id);
+        if(!label){label=this.scene.add.text(0,0,def.name+" · conversar",{fontFamily:"Georgia",fontSize:"11px",color:"#e0d2ad",backgroundColor:"#263a32cc"}).setOrigin(.5);this.ambientLabels.set(a.id,label);}
+        label.setPosition(p.x,p.y-73).setDepth(p.y+100).setVisible(visible&&Math.hypot(a.x-this.e.selected.x,a.y-this.e.selected.y)<10);
+      }
+      if(visible){this.shadowOverlay.fillStyle(0x122219,.3);this.shadowOverlay.fillEllipse(p.x,p.y+2,def.flying?14:24,8);}
+    }
+    for(const [id,sprite] of this.ambientSprites)if(!this.e.ambient.has(id)){sprite.destroy();this.ambientSprites.delete(id);this.ambientLabels.get(id)?.destroy();this.ambientLabels.delete(id);}
 
     // ALT character indicator fade in/out
     const indicatorMode = this.e.meta.settings.characterIndicator ?? "hold";
@@ -121,11 +157,15 @@ export class EntityRenderer {
         .setDepth(p.y)
         .setAlpha(dead ? 0.28 : 1)
         .setRotation(dead ? -1.4 : 0);
+      lowestDepth = Math.min(lowestDepth, p.y);
       sprite.setScale(
         hero ? balance.characterScale : entity.elite ? 1.28 : 1.08,
       );
       if (!dead && entity.attackTime > 0 && !moving)
         sprite.rotation = Math.sin(time * 0.04) * 0.035;
+      // Balanço de alavanca ao andar: gangorra sincronizada ao walkBob.
+      if (!dead && moving && !this.e.meta.settings.reducedMotion)
+        sprite.rotation = Math.sin(time * 0.016) * 0.07;
       sprite.setFlipX(
         hero
           ? entity.facing < 0
@@ -161,7 +201,7 @@ export class EntityRenderer {
       if (hero && config && hasSheets) {
         let animation = this.playerAnimations.get(entity.id);
         if (!animation) { animation = new PlayerAnimation(entity); this.playerAnimations.set(entity.id, animation); }
-        const frame = animation.update(entity, dt * this.e.debugOptions.timeScale * (this.scene.time.timeScale || 1), this.e.paused || this.e.tactical || entity.statuses.some(s => s.id === "stun"), this.e.meta.settings.reducedMotion);
+        const frame = animation.update(entity, dt * this.e.debugOptions.timeScale * (this.scene.time.timeScale || 1), this.e.paused || this.e.tactical || isStunned(entity), this.e.meta.settings.reducedMotion);
         sprite.setTexture(frame.key, frame.frame).setFlipX(false);
         const registration = playerFrameRegistration(sprite.texture, sprite.frame);
         sprite.setOrigin(registration.x / sprite.frame.width, registration.y / sprite.frame.height);
@@ -174,7 +214,7 @@ export class EntityRenderer {
         if (hasEnemySheets) {
           let eAnim = this.enemyAnimations.get(entity.id);
           if (!eAnim) { eAnim = new EnemyAnimation(entity as Enemy); this.enemyAnimations.set(entity.id, eAnim); }
-          const frame = eAnim.update(entity as Enemy, dt * this.e.debugOptions.timeScale * (this.scene.time.timeScale || 1), this.e.paused || this.e.tactical || entity.statuses.some(s => s.id === "stun"), this.e.meta.settings.reducedMotion);
+          const frame = eAnim.update(entity as Enemy, dt * this.e.debugOptions.timeScale * (this.scene.time.timeScale || 1), this.e.paused || this.e.tactical || isStunned(entity), this.e.meta.settings.reducedMotion);
           if (frame) {
             sprite.setTexture(frame.key, frame.frame).setFlipX(false);
             const registration = enemyFrameRegistration(sprite.texture, sprite.frame);
@@ -186,15 +226,28 @@ export class EntityRenderer {
       }
 
       sprite.clearTint();
-      if (isHit) {
-        sprite.setTint(0xffeedd);
-        sprite.setTintFill();
+      // Pisca em branco enquanto está invulnerável (cooldown pós-dano).
+      const invulnerable =
+        !dead && (entity.invulnUntil ?? 0) > this.e.run.stats.seconds;
+      const blinkOn =
+        invulnerable && Math.floor(this.e.run.stats.seconds * 14) % 2 === 0;
+      if (isHit || blinkOn) {
+        // Phaser 4: setTintFill() foi removido (virou no-op); o flash
+        // branco correto é FILL. clearTint() acima restaura o MULTIPLY.
+        sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
       } else if (entity.statuses.some((s) => s.id === "burn")) {
         sprite.setTint(0xffbc83);
       } else if (entity.statuses.some((s) => s.id === "slow")) {
         sprite.setTint(0xaadfff);
       } else if (entity.statuses.some((s) => s.id === "armorBreak")) {
         sprite.setTint(0xe8b4ef);
+      } else if (!hero && (entity as Enemy).variant) {
+        // Paleta alternativa da variante (0 = normal). MULTIPLY explícito
+        // porque o frame anterior pode ter deixado o modo FILL do flash.
+        const palette = enemyRegistry[(entity as Enemy).definition]
+          .variants?.[((entity as Enemy).variant ?? 0) - 1];
+        if (palette) sprite.setTint(palette.tint).setTintMode(Phaser.TintModes.MULTIPLY);
+        else sprite.clearTint();
       } else {
         sprite.clearTint();
       }
@@ -450,6 +503,14 @@ export class EntityRenderer {
         this.levelLabels.delete(id);
         this.damageTrails.delete(id);
       }
+    // Sombras e marcações de chão ficam sob todas as sprites. Sprites usam
+    // depth = iso y, que é <= 10 perto da origem — os depths fixos 5/10
+    // desenhavam por cima do personagem no início do jogo.
+    if (lowestDepth < Infinity) {
+      const floor = Math.max(-99999, lowestDepth);
+      this.shadowOverlay.setDepth(floor - 2);
+      this.groundOverlay.setDepth(floor - 1);
+    }
     for (const drop of this.e.run.drops) {
       const p = worldToIso(drop);
       if (this.e.hovered?.kind === "drop" && this.e.hovered.id === drop.id && this.e.meta.settings.hoverHighlight !== false) {
@@ -588,19 +649,28 @@ export class EntityRenderer {
       if (f.kind === "projectile" && f.to) {
         const to = worldToIso(f.to);
         this.overlay.lineBetween(p.x, p.y - 20, to.x, to.y - 20);
-      } else if (f.kind === "hit" || f.kind === "slash") {
-        if (f.kind === "slash") {
-          this.overlay.lineStyle(3, f.color, (1 - t) * 0.8);
-          this.overlay.beginPath();
-          for (let j = 0; j <= 15; j++) {
-            const a = -2.2 + j * 0.17 + t * 0.5,
-              x = p.x + Math.cos(a) * 35,
-              y = p.y - 22 + Math.sin(a) * 20;
-            if (j === 0) this.overlay.moveTo(x, y);
-            else this.overlay.lineTo(x, y);
+      } else if (f.kind === "slash") {
+        // Ataque básico melee: sprite attack-melee.png (cresce e some).
+        // O arco procedural e as faíscas antigos foram removidos.
+        if (this.scene.textures.exists("attack-melee")) {
+          let sprite = this.slashSprites.get(f.id);
+          if (!sprite) {
+            sprite = this.scene.add.image(p.x, p.y - 22, "attack-melee").setOrigin(0.5);
+            this.slashSprites.set(f.id, sprite);
           }
-          this.overlay.strokePath();
+          const animated = !this.e.meta.settings.reducedMotion;
+          // Espelha quando o golpe viaja para a esquerda da tela:
+          // iso x da direção = (dx - dy) * 32.
+          const dir = f.angle ?? 0;
+          sprite
+            .setPosition(p.x, p.y - 22)
+            .setDepth(p.y + 80)
+            .setScale(animated ? 2 + t : 2)
+            .setAlpha(1 - t)
+            .setRotation(animated ? -0.25 + t * 0.5 : 0)
+            .setFlipX(Math.cos(dir) - Math.sin(dir) < 0);
         }
+      } else if (f.kind === "hit") {
         for (let i = 0; i < 5; i++) {
           const angle = i * 1.25;
           this.overlay.lineBetween(
@@ -645,8 +715,14 @@ export class EntityRenderer {
         label.destroy();
         this.effectLabels.delete(id);
       }
+    for (const [id, sprite] of this.slashSprites)
+      if (!fxIds.has(id)) {
+        sprite.destroy();
+        this.slashSprites.delete(id);
+      }
   }
   destroy() {
+    this.ambientSprites.forEach(s=>s.destroy());this.ambientLabels.forEach(s=>s.destroy());
     this.shadowOverlay.destroy();
     this.groundOverlay.destroy();
     this.overlay.destroy();
@@ -655,6 +731,8 @@ export class EntityRenderer {
     this.labels.forEach((x) => x.destroy());
     this.levelLabels.forEach((x) => x.destroy());
     this.effectLabels.forEach((x) => x.destroy());
+    this.slashSprites.forEach((x) => x.destroy());
+    this.slashSprites.clear();
     this.playerAnimations.clear();
     this.enemyAnimations.clear();
     this.damageTrails.clear();

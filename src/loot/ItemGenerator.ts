@@ -9,7 +9,8 @@ export function generateItem(
   forcedRarity?: number,
 ): Item {
   const r = new SeededRandom(seed),
-    base = itemBaseRegistry[baseId ?? r.pick(Object.keys(itemBaseRegistry))];
+    base = itemBaseRegistry[baseId ?? r.pick(Object.values(itemBaseRegistry).filter(b=>(b.minLevel??1)<=level).map(b=>b.id))];
+  if(!base)throw Error("Item-base desconhecido");
   const roll = r.next(),
     rarity =
       forcedRarity ??
@@ -24,7 +25,7 @@ export function generateItem(
               : 0);
   const stats = { ...base.stats };
   for (const k of Object.keys(stats) as (keyof typeof stats)[])
-    stats[k] = (stats[k] ?? 0) * (1 + 0.1 * Math.sqrt(Math.max(0, level - 1)));
+    stats[k] = (stats[k] ?? 0) * (1 + 0.1 * Math.sqrt(Math.max(0, ["crit","cooldown","speed","fire","coins"].includes(k)?Math.min(20,level)-1:level-1)));
   const affixes: string[] = [];
   let candidates = Object.values(affixRegistry).filter(
     (a) =>
@@ -49,7 +50,7 @@ export function generateItem(
     slot: base.slot,
     rarity,
     level,
-    requiredLevel: Math.max(1, level - 2),
+    requiredLevel: Math.max(1, base.minLevel??1, level - 2),
     stats,
     affixes,
     tags: base.tags,

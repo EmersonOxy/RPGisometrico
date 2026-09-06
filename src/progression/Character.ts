@@ -35,6 +35,8 @@ export function createCharacter(
     points: 1,
     mastery: 0,
     passives: [],
+    skillNodes: [],
+    loadout: [...classRegistry[classId].abilities],
     equipment: {},
     jewels: [],
     cooldowns: {},
@@ -109,7 +111,7 @@ export function statsFor(c: Character): Stats {
   return s;
 }
 export function activeAbilities(c: Character) {
-  return classRegistry[c.classId].abilities.map((id) => {
+  return (c.loadout ?? classRegistry[c.classId].abilities).slice(0,4).map((id) => {
     for (const j of c.jewels)
       id = jewelRegistry[j]?.effectsByClass[c.classId]?.replace?.[id] ?? id;
     return id;

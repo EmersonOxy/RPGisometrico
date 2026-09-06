@@ -13,6 +13,7 @@ export interface ClassDefinition {
   range: number;
   basic: string;
   abilities: string[];
+  additionalAbilities?: string[];
   passives: string[];
 }
 export const classRegistry: Record<ClassId, ClassDefinition> = {
@@ -30,6 +31,7 @@ export const classRegistry: Record<ClassId, ClassDefinition> = {
     range: 1.65,
     basic: "slash",
     abilities: ["heavy", "charge", "whirl", "fury"],
+    additionalAbilities: ["rend","execute","cleave","bloodrush"],
     passives: ["momentum", "duelist", "tenacity"],
   },
   shooter: {
@@ -46,6 +48,7 @@ export const classRegistry: Record<ClassId, ClassDefinition> = {
     range: 7,
     basic: "arrow",
     abilities: ["pierce", "volley", "retreat", "trap"],
+    additionalAbilities: ["pin","snare","fan","snipe"],
     passives: ["precision", "hunter", "lightfoot"],
   },
   mage: {
@@ -62,6 +65,7 @@ export const classRegistry: Record<ClassId, ClassDefinition> = {
     range: 6,
     basic: "bolt",
     abilities: ["arcane", "nova", "chain", "blink"],
+    additionalAbilities: ["fireball","meteor","frostlance","ward"],
     passives: ["affinity", "conductor", "concentration"],
   },
   tank: {
@@ -78,6 +82,7 @@ export const classRegistry: Record<ClassId, ClassDefinition> = {
     range: 1.7,
     basic: "bash",
     abilities: ["taunt", "guard", "slam", "protect"],
+    additionalAbilities: ["shieldrush","riposte","rally","sunder"],
     passives: ["fortitude", "guardian", "immovable"],
   },
 };

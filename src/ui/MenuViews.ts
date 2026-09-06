@@ -2,6 +2,9 @@ import type { MetaProgress, RunState, ClassId } from "../core/types";
 import { icon, portrait } from "./Icons";
 import { classRegistry } from "../data/classes";
 import { esc, gameButton } from "./Components";
+export function expeditionSettingsView() {
+  return `<div class="expedition-settings"><label>Dificuldade<select id="difficulty"><option value="explorer">Explorador · dano recebido menor</option><option value="normal" selected>Normal</option><option value="veteran">Veterano · inimigos mais atentos</option><option value="brutal">Brutal · menor margem de erro</option></select></label><label>Escala dos biomas<select id="biome-scale"><option value="compact">Compacto</option><option value="standard" selected>Padrão</option><option value="wide">Amplo</option></select></label><label>Densidade de ameaças<select id="threat-density"><option value="low">Baixa</option><option value="normal" selected>Normal</option><option value="high">Alta</option></select></label></div>`;
+}
 import {
   ACTION_NAMES,
   DEFAULT_KEYBINDINGS,
@@ -60,7 +63,7 @@ export function selectionView(meta: MetaProgress, choice: ClassId) {
       )
       .join("") +
     '</div><label class="seed-label">Semente do mundo<input id="seed" value="" maxlength="64" placeholder="Deixe vazio para descobrir um mundo"></label><p>Nova jornada: reinicia moedas, classes, grupo, mapa e progressão. Suas configurações são mantidas.</p>' +
-    gameButton("Partir para o desconhecido", "embark") +
+    expeditionSettingsView() + gameButton("Partir para o desconhecido", "embark") +
     "</section>"
   );
 }

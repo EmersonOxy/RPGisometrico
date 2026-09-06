@@ -38,11 +38,18 @@ test("sprites gerais registradas e choque térmico visível", async ({page}) => 
       return {id,texture:s.texture.key,height:r.height*s.scaleY,footError:Math.abs(s.originY*s.frame.height-r.y)};
     });
   });
-  for (const m of metrics) { expect(m.texture).toBe(`${m.id}-sheet-idle`); expect(m.footError).toBeLessThan(.001); expect(m.height).toBeGreaterThan(60); }
+  const heights: Record<string,number> = {slime:62.4,boar:85.8,wolf:85.8,witch:78,golem:109.2};
+  for (const m of metrics) {
+    expect(m.texture).toBe(`${m.id}-sheet-idle`);
+    expect(m.footError).toBeLessThan(.001);
+    // Breathing poses vary around the sheet's median body height.
+    expect(m.height / heights[m.id]).toBeGreaterThan(.8);
+    expect(m.height / heights[m.id]).toBeLessThan(1.2);
+  }
   await page.screenshot({path:"artifacts/refinement-sprites.png"});
   await page.evaluate(() => {
     const e = (window as any).__game.engine, t = e.enemies.get("gallery-slime");
-    e.combat.hit(e.selected.id,t,10,"slow"); e.combat.hit(e.selected.id,t,10,"burn");
+    e.combat.hit(e.selected.id,t,10,"slow"); e.run.stats.seconds += 1; e.combat.hit(e.selected.id,t,10,"burn");
   });
   await expect.poll(() => page.evaluate(() => (window as any).__game.engine.effects.some((f:any) => f.text === "Choque térmico"))).toBe(true);
   await page.screenshot({path:"artifacts/refinement-thermal-shock.png"});

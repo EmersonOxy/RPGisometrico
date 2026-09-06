@@ -6,6 +6,8 @@ export interface EnemySpriteSheetConfig {
   columns: number;
   rows: number;
   fps: number;
+  /** Pixel-art 32x32 precisa de NEAREST; sem isso amplia embaçado. */
+  filter?: "nearest" | "linear";
 }
 
 export interface EnemySpriteEntry {
@@ -40,10 +42,12 @@ export const enemySpriteConfig: Record<string, EnemySpriteEntry> = {
   golem: {
     idle: sheet("golem", "idle",
       new URL("../../assets/sprite/enemy/golem de musgo/golem_idle.png", import.meta.url).href,
-      4, 8, 4),
+      4, 9, 4),
+    // The supplied walk export has an opaque background. Reuse the clean
+    // directional poses until a transparent locomotion sheet is available.
     walk: sheet("golem", "walk",
-      new URL("../../assets/sprite/enemy/golem de musgo/golem_walk.png", import.meta.url).href,
-      4, 8, 10),
+      new URL("../../assets/sprite/enemy/golem de musgo/golem_idle.png", import.meta.url).href,
+      4, 9, 6),
     scale: 1.4,
     anchorX: 0.5,
     anchorY: 1.0,
@@ -77,12 +81,14 @@ export const enemySpriteConfig: Record<string, EnemySpriteEntry> = {
     anchorY: 0.96,
   },
   slime: {
-    idle: sheet("slime", "idle",
-      new URL("../../assets/sprite/enemy/slime/slime.png", import.meta.url).href,
-      4, 8, 4),
+    idle: {
+      ...sheet("slime", "idle",
+        new URL("../../assets/sprite/enemy/slime/slime_idle.png", import.meta.url).href,
+        7, 8, 6),
+      filter: "nearest",
+    },
     scale: 0.8,
     anchorX: 0.5,
     anchorY: 0.90,
-    directionMap: [4, 5, 6, 7, 0, 1, 2, 3],
   },
 };

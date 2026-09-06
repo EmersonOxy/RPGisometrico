@@ -45,6 +45,10 @@ export function createPlayerFrames(scene: Phaser.Scene) {
   for (const config of Object.values(playerSpriteConfig)) for (const sheet of Object.values(config.sheets)) {
     if (!scene.textures.exists(sheet.key)) continue;
     const texture = scene.textures.get(sheet.key), source = texture.getSourceImage();
+    // NEAREST (= 1, Phaser.Textures.FilterMode.NEAREST) sem importar o
+    // Phaser como valor: este módulo também roda nos testes em Node, onde
+    // o bundle do Phaser não carrega (window undefined).
+    if (sheet.filter === "nearest") texture.setFilter(1 as Phaser.Textures.FilterMode);
     const canvas = document.createElement("canvas");
     canvas.width = source.width; canvas.height = source.height;
     const context = canvas.getContext("2d", { willReadFrequently: true });
@@ -89,7 +93,9 @@ export class PlayerAnimation {
   }
   update(c: Character, dt: number, paused: boolean, reducedMotion: boolean) {
     const distance = Math.hypot(c.x - this.x, c.y - this.y);
-    const moved = distance > .0001 && distance < 3;
+    // Deslize de knockback não é passo voluntário: não vira nem anima andar.
+    const knocked = Boolean(c.knockX || c.knockY);
+    const moved = !knocked && distance > .0001 && distance < 3;
     if (!paused && c.alive) {
       if (moved) this.direction = playerDirection(c.x - this.x, c.y - this.y);
       else if (c.attackTime > 0) this.direction = playerDirection(Math.cos(c.facingAngle ?? 0), Math.sin(c.facingAngle ?? 0));

@@ -22,6 +22,9 @@ export function createEnemyFrames(scene: Phaser.Scene) {
     for (const s of [config.idle, config.walk].filter(Boolean)) {
       if (!scene.textures.exists(s!.key)) continue;
       const texture = scene.textures.get(s!.key);
+      // NEAREST (= 1) sem importar o Phaser como valor: este módulo também
+      // roda nos testes em Node, onde o bundle do Phaser não carrega.
+      if (s!.filter === "nearest") texture.setFilter(1 as Phaser.Textures.FilterMode);
       const source = texture.getSourceImage();
       const w = source.width;
       const h = source.height;
@@ -76,7 +79,9 @@ export class EnemyAnimation {
     if (!config) return null;
 
     const dist = Math.hypot(e.x - this.x, e.y - this.y);
-    const moved = dist > 0.0001 && dist < 3;
+    // Deslize de knockback não é passo voluntário: não vira nem anima andar.
+    const knocked = Boolean(e.knockX || e.knockY);
+    const moved = !knocked && dist > 0.0001 && dist < 3;
 
     if (!paused && e.hp > 0) {
       if (moved) this.direction = enemyDirection(e.x - this.x, e.y - this.y);

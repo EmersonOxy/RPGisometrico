@@ -19,7 +19,7 @@ export class ShopSystem {
     const level = regionLevel(
       poi.x,
       poi.y,
-      biomeRegistry[sampleBiome(this.e.run.seed, poi.x, poi.y)].danger,
+      biomeRegistry[sampleBiome(this.e.run.seed, poi.x, poi.y, this.e.run.worldSettings)].danger,
     );
     return shopRegistry.general.items.map((id) =>
       generateItem(

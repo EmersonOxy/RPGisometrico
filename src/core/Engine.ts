@@ -16,6 +16,7 @@ import type {
 import { EventBus } from "./EventBus";
 import { ChunkManager } from "../world/ChunkManager";
 import { CombatSystem } from "../combat/CombatSystem";
+import { isStunned } from "../combat/DamageSystem";
 import { ShopSystem } from "../shops/ShopSystem";
 import { SeededRandom } from "../utils/SeededRandom";
 import { balance, regionLevel } from "../data/balance";
@@ -35,7 +36,18 @@ import { findPath, smoothPath, lineWalkable } from "../world/navigation/AStar";
 import { chunkAt, distance } from "../world/WorldCoordinates";
 import { sampleBiome } from "../world/generation/WorldGenerator";
 import { moveEntities, tickAI } from "../entities/AI";
+import { worldSettings, difficultyRegistry, populationBalance } from "../data/worldSettings";
+import { tickAmbient } from "../entities/AmbientAI";
+import { ambientRegistry } from "../data/ambient";
+import { poiDefinition } from "../data/pois";
+import { learnSkill, equipAbility } from "../progression/SkillTree";
 export class Engine {
+  canChangeLoadout() {
+    return !this.run.ended && !this.run.party.some(c=>c.alive&&((c.combatUntil??0)>this.run.stats.seconds||this.combat.busy(c.id))) &&
+      ![...this.enemies.values()].some(en=>en.target&&this.run.party.some(c=>c.id===en.target&&c.alive)) && !this.projectiles.length && !this.hazards.length;
+  }
+  ambient = new Map<string, import("./types").AmbientEntity>();
+  private populationTime = 0;
   sandboxActive = false;
   debugOptions = {godMode:false,freezeEnemies:false,noCooldowns:false,unlimitedResource:false,timeScale:1};
   readonly orders = new Map<string, { kind: "move" | "defend" | "attack" | "investigate"; point: Point; remaining: number; poi?: string }>();
@@ -103,6 +115,7 @@ export class Engine {
     private persist: () => Promise<void>,
   ) {
     this.run.cartography ??= {};
+    this.run.worldSettings = worldSettings(this.run.worldSettings);
     this.run.targetQueue ??= [];
     this.run.commandSelection ??= [];
     this.meta.tutorials ??= {};
@@ -115,12 +128,17 @@ export class Engine {
       run.seed,
       (c) => this.loaded(c),
       (key) => {
+        for (const [id, entity] of this.ambient) {
+          const c=chunkAt(entity.home.x,entity.home.y);
+          if(c.x+","+c.y===key)this.ambient.delete(id);
+        }
         for (const [id, enemy] of this.enemies) {
           const c = chunkAt(enemy.home.x, enemy.home.y);
           if (c.x + "," + c.y === key) this.enemies.delete(id);
         }
       },
       run.worldVersion ?? 1,
+      this.run.worldSettings,
     );
     this.combat = new CombatSystem(this);
     this.targeting = new TargetingSystem(this);
@@ -145,6 +163,7 @@ export class Engine {
     radius: number,
     to?: Point,
     text?: string,
+    angle?: number,
   ) {
     const effect = {
       x: p.x,
@@ -157,6 +176,7 @@ export class Engine {
       radius,
       to: to ? { x: to.x, y: to.y } : undefined,
       text,
+      angle,
     };
     this.effects.push(effect);
     if (this.effects.length > 100) this.effects.shift();
@@ -167,10 +187,12 @@ export class Engine {
     if (this.run.discovered.includes(chunk.key))
       this.run.cartography![chunk.key] = summarizeChunk(chunk);
     for (const spawn of chunk.spawns) {
-      if (this.run.deltas[spawn.id]) continue;
+      if (this.run.deltas[spawn.id] || this.enemies.has(spawn.id)) continue;
+      if ((this.run.worldVersion ?? 1)>=3 && (this.enemies.size>=populationBalance.maxActiveEnemies || distance(spawn,this.selected)>42)) continue;
       const def = enemyRegistry[spawn.definition],
+        palette = (spawn.variant ?? 0) > 0 ? def.variants?.[(spawn.variant ?? 0) - 1] : undefined,
         maxHp =
-          def.health * (1 + 0.18 * (spawn.level - 1)) * (spawn.elite ? 2.5 : 1);
+          def.health * (1 + 0.18 * (spawn.level - 1)) * (spawn.elite ? 2.5 : 1) * (palette?.hpMult ?? 1) * difficultyRegistry[this.run.worldSettings!.difficulty].health;
       this.enemies.set(spawn.id, {
         ...spawn,
         hp: maxHp,
@@ -189,6 +211,10 @@ export class Engine {
         home: { x: spawn.x, y: spawn.y },
         threat: {},
       });
+    }
+    for(const spawn of chunk.ambient ?? []) {
+      if(this.ambient.has(spawn.id) || this.ambient.size>=populationBalance.maxAmbient || distance(spawn,this.selected)>38)continue;
+      this.ambient.set(spawn.id,{...spawn,home:{x:spawn.x,y:spawn.y},state:"REST",timer:0,step:0});
     }
   }
   nearestEnemy(p: Point, range: number) {
@@ -235,7 +261,7 @@ export class Engine {
     if (
       !c ||
       !c.alive ||
-      c.statuses.some((s) => s.id === "stun") ||
+      isStunned(c) ||
       this.combat.movementLocked(c.id)
     )
       return;
@@ -279,6 +305,12 @@ export class Engine {
     try {
       const c = this.selected;
       switch (cmd.type) {
+        case "skill":
+          if(!this.canChangeLoadout())throw Error("Aprenda disciplinas fora de combate.");
+          learnSkill(c,cmd.id); break;
+        case "loadout":
+          if(!this.canChangeLoadout())throw Error("Troque habilidades fora de combate, após 5 s sem ações hostis.");
+          equipAbility(c,cmd.id,cmd.slot);this.targeting.cancelPreview();this.targeting.pendingSkill=null;this.combat.buffer.clear();break;
         case "move": {
           this.pendingInteraction = undefined;
           this.meta.tutorials.move = true;
@@ -289,6 +321,7 @@ export class Engine {
           break;
         }
         case "target":
+          if (!this.enemies.has(cmd.id)) break;
           this.pendingInteraction = undefined;
           c.target = cmd.id;
           {
@@ -335,6 +368,7 @@ export class Engine {
           this.run.focusTargetId = cmd.id;
           break;
         case "targetQueueAdd": {
+          if (this.ambient.has(cmd.id)) break;
           this.run.targetQueue ??= [];
           const idx = this.run.targetQueue.indexOf(cmd.id);
           if (idx >= 0) {
@@ -497,6 +531,7 @@ export class Engine {
           "recruit",
           "mastery",
           "passive",
+          "skill", "loadout",
         ].includes(cmd.type)
       )
         void this.save();
@@ -509,6 +544,14 @@ export class Engine {
       (poi.kind === "shrine" && this.run.party.some(c => !c.alive));
   }
   interact(id: string, actor = this.selected) {
+    const npc=this.ambient.get(id);
+    if(npc?.kind==="npc") {
+      if(distance(actor,npc)>3){this.move(actor,npc);this.bus.emit("notice","Aproxime-se e use Explorar novamente para conversar.");return;}
+      const def=ambientRegistry[npc.definition], b=this.world.cell(Math.floor(npc.x),Math.floor(npc.y)).biome;
+      const lines=def.dialogue ?? [];
+      this.bus.emit("notice",`${def.name}: ${lines[npc.step % lines.length] ?? "Boa viagem."} (${b})`);
+      this.run.deltas[id+":met"]=true; void this.save(); return;
+    }
     const poi = [...this.world.chunks.values()]
       .flatMap((c) => c.pois)
       .find((p) => p.id === id);
@@ -523,6 +566,12 @@ export class Engine {
     this.pendingInteraction = undefined;
     this.orders.delete(actor.id);
     actor.path = [];
+    const site=poiDefinition(poi);
+    if(site && !this.run.deltas[id+":discovered"]) {
+      this.run.deltas[id+":discovered"]=true;
+      for(const member of this.run.party) if(member.alive)addExperience(member,site.discoveryXp);
+      this.bus.emit("notice",`${site.name} descoberto · ${site.discoveryXp} XP de exploração`);
+    }
     if (poi.kind === "merchant") {
       this.shop.active = id;
       this.paused = true;
@@ -607,6 +656,7 @@ export class Engine {
         enemy.hp = Math.min(enemy.maxHp, enemy.hp + dt * 1.5);
     }
     if (!this.tactical) {
+      tickAmbient(this,dt);
       for (const [id, task] of this.orders) {
         const member = this.run.party.find(m=>m.id===id && m.alive);
         task.remaining -= dt;
@@ -672,6 +722,13 @@ export class Engine {
     for (const f of this.effects) f.remaining -= realDt;
     this.effects = this.effects.filter((f) => f.remaining > 0);
     this.world.update(this.selected);
+    this.populationTime+=dt;
+    if(this.populationTime>1) {
+      this.populationTime=0;
+      for(const [id,a] of this.ambient) if(distance(a.home,this.selected)>45)this.ambient.delete(id);
+      for(const [id,a] of this.enemies) if(a.encounterId && distance(a.home,this.selected)>48 && !a.target)this.enemies.delete(id);
+      for(const chunk of this.world.chunks.values())this.loaded(chunk);
+    }
     if (this.pendingInteraction) {
       const p = [...this.world.chunks.values()]
         .flatMap((c) => c.pois)
@@ -694,7 +751,7 @@ export class Engine {
       this.run.discoveryMask = this.discoveryMask.serialize();
       this.saveTime = balance.autosave;
     }
-    const biome = sampleBiome(this.run.seed, this.selected.x, this.selected.y);
+    const biome = sampleBiome(this.run.seed, this.selected.x, this.selected.y, this.run.worldSettings);
     const dangerLvl = regionLevel(this.selected.x, this.selected.y);
     if (
       dangerLvl >= this.selected.level + 4 &&
@@ -886,5 +943,6 @@ export class Engine {
     this.disposed = true;
     this.off();
     this.world.destroy();
+    this.ambient.clear();
   }
 }

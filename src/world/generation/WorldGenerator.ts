@@ -3,6 +3,10 @@ import type { BiomeId, Chunk, Poi, Tile } from "../../core/types";
 import { at, SeededRandom } from "../../utils/SeededRandom";
 import { biomeRegistry } from "../../data/biomes";
 import { balance, regionLevel } from "../../data/balance";
+import { biomeScales, defaultWorldSettings, type WorldGenerationSettings } from "../../data/worldSettings";
+import { poiRegistry, poiDefinition } from "../../data/pois";
+import { populateChunk } from "./Population";
+import { ambientSpawns } from "./AmbientGeneration";
 const smooth = (t: number) => t * t * (3 - 2 * t);
 function noise(seed: string, x: number, y: number, scale: number) {
   x /= scale;
@@ -15,11 +19,11 @@ function noise(seed: string, x: number, y: number, scale: number) {
     b = at(seed, ix, iy + 1) * (1 - fx) + at(seed, ix + 1, iy + 1) * fx;
   return a * (1 - fy) + b * fy;
 }
-export function fields(seed: string, x: number, y: number) {
+export function fields(seed: string, x: number, y: number, settings = defaultWorldSettings) {
   const blend = smooth(Math.min(1, Math.hypot(x, y) / 55));
   const sample = (tag: string) => {
     const raw =
-      noise(seed + tag, x, y, 85) * 0.72 + noise(seed + tag, x, y, 29) * 0.28;
+      noise(seed + tag, x, y, 85 * biomeScales[settings.biomeScale]) * 0.72 + noise(seed + tag, x, y, 29 * biomeScales[settings.biomeScale]) * 0.28;
     const origin =
       tag === ":moisture" ? 0.43 : tag === ":elevation" ? 0.52 : 0.5;
     return origin * (1 - blend) + raw * blend;
@@ -31,8 +35,8 @@ export function fields(seed: string, x: number, y: number) {
     wildness: sample(":wildness"),
   };
 }
-export function sampleBiome(seed: string, x: number, y: number): BiomeId {
-  const f = fields(seed, x, y);
+export function sampleBiome(seed: string, x: number, y: number, settings = defaultWorldSettings): BiomeId {
+  const f = fields(seed, x, y, settings);
   if (f.temperature < 0.31) return "ice";
   if (f.elevation > 0.68) return "mountain";
   if (f.moisture > 0.62 && f.elevation < 0.49) return "swamp";
@@ -40,14 +44,14 @@ export function sampleBiome(seed: string, x: number, y: number): BiomeId {
   if (f.moisture > 0.49) return "forest";
   return "plains";
 }
-export function poisFor(seed: string, cx: number, cy: number): Poi[] {
+export function poisFor(seed: string, cx: number, cy: number, version = 2, settings = defaultWorldSettings): Poi[] {
   if (cx === 0 && cy === 0)
     return [
       { id: "origin:merchant", kind: "merchant", x: 4, y: 2 },
       { id: "origin:chest", kind: "chest", x: 9, y: 1 },
       { id: "origin:shrine", kind: "shrine", x: 1, y: 9 },
     ];
-  const macro = 3,
+  const macro = version >= 3 ? 2 : 3,
     mx = Math.floor(cx / macro),
     my = Math.floor(cy / macro),
     r = new SeededRandom(seed + ":poi:" + mx + "," + my);
@@ -56,6 +60,15 @@ export function poisFor(seed: string, cx: number, cy: number): Poi[] {
   if (cx !== px || cy !== py) return [];
   const x = cx * balance.chunkSize + r.int(4, balance.chunkSize - 5),
     y = cy * balance.chunkSize + r.int(6, 25);
+  if (version >= 3) {
+    const biome = sampleBiome(seed, x, y, settings);
+    const candidates = Object.entries(poiRegistry).filter(([,p]) => p.biomes.includes(biome) && (Math.hypot(x,y)>45 || p.safe));
+    const [variant, def] = r.pick(candidates);
+    // Keep footprints inside their owning chunk and away from adjacent sites.
+    const px = cx * 32 + Math.max(7, Math.min(24, x-cx*32));
+    const py = cy * 32 + Math.max(7, Math.min(24, y-cy*32));
+    return [{id:`site:${mx},${my}`, x:px, y:py, kind:def.kind, variant}];
+  }
   return [
     {
       id: "poi:" + mx + "," + my,
@@ -78,8 +91,9 @@ export function sampleTile(
   y: number,
   pois?: Poi[],
   version = 2,
+  settings: WorldGenerationSettings = defaultWorldSettings,
 ): Tile {
-  const biome = sampleBiome(seed, x, y),
+  const biome = sampleBiome(seed, x, y, settings),
     b = biomeRegistry[biome];
   const nearby =
     pois ??
@@ -87,10 +101,11 @@ export function sampleTile(
       seed,
       Math.floor(x / balance.chunkSize),
       Math.floor(y / balance.chunkSize),
+      version, settings,
     );
   const clear =
     Math.hypot(x, y) < balance.safeRadius ||
-    nearby.some((p) => Math.hypot(x - p.x, y - p.y) < 3) ||
+    nearby.some((p) => Math.hypot(x - p.x, y - p.y) < (poiDefinition(p)?.radius ?? 3)) ||
     Math.abs(y) < 1 ||
     Math.abs(x) < 1;
   const comp = composition(seed, x, y);
@@ -112,8 +127,9 @@ export function generateChunk(
   cx: number,
   cy: number,
   version = 2,
+  settings: WorldGenerationSettings = defaultWorldSettings,
 ): Chunk {
-  const pois = poisFor(seed, cx, cy),
+  const pois = poisFor(seed, cx, cy, version, settings),
     tiles: Tile[] = [],
     spawns: Chunk["spawns"] = [];
   for (let y = 0; y < balance.chunkSize; y++)
@@ -125,8 +141,15 @@ export function generateChunk(
           cy * balance.chunkSize + y,
           pois,
           version,
+          settings,
         ),
       );
+  if (version >= 3) {
+    const chunk: Chunk = {key:cx+","+cy,cx,cy,tiles,pois,spawns};
+    populateChunk(seed, chunk, settings);
+    chunk.ambient = ambientSpawns(seed, chunk);
+    return chunk;
+  }
   const r = new SeededRandom(seed + ":enemy:" + cx + "," + cy);
   for (let i = 0; i < 12; i++) {
     const x = cx * balance.chunkSize + r.int(2, balance.chunkSize - 3) + 0.5,

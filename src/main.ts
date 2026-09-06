@@ -10,6 +10,7 @@ import { WorldScene } from "./game/WorldScene";
 import { AudioFeedback } from "./game/Audio";
 import { InputManager } from "./core/InputManager";
 import { CursorManager } from "./ui/CursorManager";
+import type { WorldGenerationSettings } from "./data/worldSettings";
 const repository = new SaveRepository(),
   bus = new EventBus();
 let engine: Engine | undefined;
@@ -89,12 +90,12 @@ const app = {
     engine = new Engine(run, meta, bus, save);
     void engine.save();
   },
-  start(seed: string, cls: ClassId) {
+  start(seed: string, cls: ClassId, settings?: WorldGenerationSettings) {
     if (cls !== "fighter") throw Error("Uma nova jornada começa com o Lutador.");
     worldScene.cancelGestures(); inputManager.clear(); cursorManager.setTargeting(false);
     engine?.destroy();
     sandboxSnapshot = undefined;
-    const fresh = freshGame(seed, meta);
+    const fresh = freshGame(seed, meta, settings);
     meta = fresh.meta; run = fresh.run;
     engine = new Engine(run, meta, bus, save);
     void engine.save();

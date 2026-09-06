@@ -1,4 +1,4 @@
-import type { Character, Enemy, StatusId } from "../core/types";
+import type { Character, Enemy, Status, StatusId } from "../core/types";
 import { statsFor } from "../progression/Character";
 export interface DamagePacket {
   source: string;
@@ -38,6 +38,13 @@ export function applyStatus(
     old.power = Math.max(old.power, power);
   } else
     target.statuses.push({ id, remaining: duration, tick: 0, source, power });
+}
+/**
+ * Travado por atordoamento: vale para "stun" (habilidades, com indicador
+ * visual) e "stagger" (knockback, sem indicador). Passivos não são afetados.
+ */
+export function isStunned(target: { statuses: Status[] }) {
+  return target.statuses.some((s) => s.id === "stun" || s.id === "stagger");
 }
 export function armorFor(target: Character | Enemy) {
   const armor =

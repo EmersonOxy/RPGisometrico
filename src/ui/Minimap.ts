@@ -47,7 +47,7 @@ export function drawMinimap(canvas: HTMLCanvasElement, e: Engine) {
       continue;
 
     const summaries = (e.run.cartography ??= {}),
-      data = (summaries[key] ??= reconstructSummary(e.run.seed, key)),
+      data = (summaries[key] ??= reconstructSummary(e.run.seed, key, e.run.worldVersion, e.run.worldSettings)),
       cell = span / 8;
 
     for (let i = 0; i < 64; i++) {

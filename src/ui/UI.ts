@@ -48,6 +48,9 @@ import { LootFeed } from "./LootFeed";
 import { sandboxView, applySandbox, validateSandbox } from "./SandboxView";
 import { statsFor } from "../progression/Character";
 import type { RadialWheel } from "./RadialWheel";
+import { worldSettings, type WorldGenerationSettings } from "../data/worldSettings";
+import { skillNodeRegistry } from "../data/skillTree";
+import { skillRequirement, effectiveAbility } from "../progression/SkillTree";
 
 interface App {
   sandbox: boolean;
@@ -60,7 +63,7 @@ interface App {
   cursor: CursorManager;
   radial?: () => RadialWheel | undefined;
   cancelGestures?: () => void;
-  start: (seed: string, cls: ClassId) => void;
+  start: (seed: string, cls: ClassId, settings?: WorldGenerationSettings) => void;
   resume: () => void;
   menu: () => void;
   save: () => Promise<void>;
@@ -148,6 +151,7 @@ export class UI {
       ).onfinish = () => fly.remove();
     });
     bus.on("changed", () => this.refresh());
+    bus.on("save", () => this.refresh());
     bus.on("notice", (s) => this.notice(s));
     bus.on("shop", () => this.panels.open("shop"));
     bus.on("run:ended", () => this.panels.open("over"));
@@ -174,6 +178,11 @@ export class UI {
       }
     });
     this.root.addEventListener("change", (ev) => {
+      const loadout=ev.target as HTMLSelectElement;
+      if(loadout.matches("[data-loadout-slot]")) {
+        this.app.engine?.command({type:"loadout",id:loadout.value,slot:Number(loadout.dataset.loadoutSlot)});
+        this.refreshPanel();return;
+      }
       const t = ev.target as HTMLInputElement | HTMLSelectElement,
         k = t.dataset.setting,
         s = this.app.meta.settings as Record<string, unknown>;
@@ -467,7 +476,7 @@ export class UI {
     if (kind === "socket")
       return "<h3>Receptáculo vazio</h3><p>Arraste uma joia da bolsa para formar um vínculo.</p>";
     if (kind === "ability") {
-      const a = abilityRegistry[id];
+      const a = c ? effectiveAbility(c,id) : abilityRegistry[id];
       const slot = this.app.engine ? activeAbilities(this.app.engine.selected).indexOf(id) : -1;
       const key = slot >= 0 ? bindingLabel(this.app.meta.settings, `ABILITY_${slot+1}` as InputAction) : "Mouse 2";
       return a
@@ -502,6 +511,12 @@ export class UI {
           : "Custo: 1 ponto · ligado ao núcleo da classe") +
         "</p>"
       );
+    }
+    if(kind==="skill") {
+      const n=skillNodeRegistry[id]; if(!n||!c)return "";
+      const name=n.ability?abilityRegistry[n.ability].name:n.passive?passiveRegistry[n.passive].name:n.name;
+      const description=n.ability?abilityRegistry[n.ability].description:n.passive?passiveRegistry[n.passive].description:n.description;
+      return `<h3>${esc(name)}</h3><p>${esc(description)}</p><p>${n.ability?"Ativa desbloqueável":n.upgrade?"Melhoria de habilidade":n.condition?"Talento condicional":"Passivo"} · nível ${n.level} · ${n.cost} ponto(s)</p><p>Requisitos: ${n.prerequisites.map(p=>skillNodeRegistry[p].name).join(", ")||"Núcleo da classe"}</p><p>${skillRequirement(c,id)}</p>`;
     }
     if (kind === "mastery")
       return "<h3>Maestria</h3><p>Aumenta o dano com retornos decrescentes. Pode ser aprendida repetidamente.</p><p>Custo: 1 ponto</p>";
@@ -576,7 +591,8 @@ export class UI {
           c.mastery,
           c.equipment,
           c.jewels,
-          c.passives,
+            c.passives,
+            c.skillNodes, c.loadout,
           e.run.inventory,
           e.run.jewels,
           e.meta.silver,
@@ -640,7 +656,8 @@ export class UI {
         const seed =
           (document.getElementById("seed") as HTMLInputElement).value.trim() ||
           "mundo-" + crypto.getRandomValues(new Uint32Array(1))[0].toString(36);
-        this.app.start(seed, this.choice);
+        const settings=worldSettings({difficulty:(document.getElementById("difficulty") as HTMLSelectElement).value as WorldGenerationSettings["difficulty"],biomeScale:(document.getElementById("biome-scale") as HTMLSelectElement).value as WorldGenerationSettings["biomeScale"],threatDensity:(document.getElementById("threat-density") as HTMLSelectElement).value as WorldGenerationSettings["threatDensity"]});
+        this.app.start(seed, this.choice, settings);
         this.atlasState = { x: 0, y: 0, zoom: 8, initialized: false };
         this.showGame();
         return;
@@ -791,9 +808,29 @@ export class UI {
             ),
           );
         return;
-      case "save":
-        void e?.save();
+      case "save": {
+        if (!e) {
+          this.notice("Nada a salvar no momento.");
+          return;
+        }
+        if (e.sandboxActive) {
+          // Salvamento (manual e automático) é suspenso no sandbox de
+          // propósito para não contaminar o save real com o experimento.
+          this.notice(
+            "Sandbox ativo: salvamento suspenso. Use “Incorporar à partida e salvar” no laboratório (F3).",
+          );
+          return;
+        }
+        // Com o jogo pausado o HUD não atualiza sozinho: confirma e
+        // redesenha ao concluir para o jogador ver que salvou.
+        void e.save().then(() => {
+          this.notice(
+            e.saveStatus === "Salvo" ? "Progresso salvo." : e.saveStatus,
+          );
+          this.refresh();
+        });
         return;
+      }
       case "copy":
         void navigator.clipboard
           .writeText(e?.run.seed ?? "")
@@ -860,7 +897,7 @@ export class UI {
     if (action === "party")
       command = { type: "party", command: id as RunState["command"] };
     if (
-      ["equip", "jewel", "unjewel", "buy", "sell", "passive"].includes(action)
+      ["equip", "jewel", "unjewel", "buy", "sell", "passive", "skill"].includes(action)
     )
       command = { type: action, id } as Command;
     if (action === "unequip") command = { type: "unequip", slot: id as Slot };

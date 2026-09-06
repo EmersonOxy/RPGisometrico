@@ -265,6 +265,7 @@ export class AtlasView {
               this.e.run.seed,
               cx * n + n / 2,
               cy * n + n / 2,
+              this.e.run.worldSettings,
             );
             this.coarse.set(key, biome);
           }
@@ -274,7 +275,7 @@ export class AtlasView {
             more = true;
             continue;
           }
-          data = summaries[key] = reconstructSummary(this.e.run.seed, key);
+          data = summaries[key] = reconstructSummary(this.e.run.seed, key, this.e.run.worldVersion, this.e.run.worldSettings);
         }
       }
       const cell = size / 8;

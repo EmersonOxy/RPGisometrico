@@ -3,6 +3,10 @@ import { enemyRegistry } from "../data/enemies";
 import { classRegistry } from "../data/classes";
 import { distance } from "../world/WorldCoordinates";
 import { statsFor } from "../progression/Character";
+import { difficultyRegistry, populationBalance, defaultWorldSettings } from "../data/worldSettings";
+import { SeededRandom } from "../utils/SeededRandom";
+import { lineWalkable } from "../world/navigation/AStar";
+import { isStunned } from "../combat/DamageSystem";
 export function tickAI(e: Engine, dt: number) {
   const leader = e.selected;
   for (const c of e.run.party) {
@@ -62,7 +66,8 @@ export function tickAI(e: Engine, dt: number) {
         e.approach(c, foe, classRegistry[c.classId].range);
       else {
         c.path = [];
-        if (!e.combat.cast(c, c.classId === "tank" ? 0 : 1))
+        const slots=[0,1,2,3].filter(slot=>e.combat.availability(c,slot)==="ready");
+        if (!slots.some(slot=>e.combat.cast(c,slot,foe)))
           e.combat.cast(c, -1);
       }
     } else {
@@ -77,13 +82,13 @@ export function tickAI(e: Engine, dt: number) {
   }
   for (const enemy of e.enemies.values()) {
     if(e.debugOptions.freezeEnemies){enemy.path=[];continue;}
-    if (distance(enemy, leader) > 24) {
+    if (distance(enemy, leader) > populationBalance.activeRadius) {
       enemy.path = [];
       continue;
     }
     enemy.aiTime -= dt;
     enemy.timer -= dt;
-    if (enemy.statuses.some((s) => s.id === "stun")) {
+    if (isStunned(enemy)) {
       enemy.state = "STUNNED";
       enemy.path = [];
       continue;
@@ -91,11 +96,18 @@ export function tickAI(e: Engine, dt: number) {
     if (enemy.aiTime > 0) continue;
     enemy.aiTime = 0.25;
     const def = enemyRegistry[enemy.definition];
+    const profile=enemy.encounterId?def.environment:undefined;
+    const difficulty=difficultyRegistry[(e.run.worldSettings??defaultWorldSettings).difficulty];
+    if(profile && enemy.state==="RETURN_HOME") {
+      enemy.target=undefined; enemy.threat={};
+      if(distance(enemy,enemy.home)>1) {if(!enemy.path.length)e.move(enemy,enemy.home);continue;}
+      enemy.state="REST";enemy.alerted=false;enemy.ambientTime=profile.rest;
+    }
     const party = e.run.party
       .filter(
         (c) =>
           c.alive &&
-          distance(c, enemy) < def.aggro &&
+          distance(c, enemy) < (profile && enemy.target===c.id?profile.pursuit:def.aggro*difficulty.perception) &&
           Math.hypot(c.x - 4, c.y - 2) > 3.2,
       )
       .sort(
@@ -103,18 +115,43 @@ export function tickAI(e: Engine, dt: number) {
           (enemy.threat[b.id] ?? 0) - (enemy.threat[a.id] ?? 0) ||
           distance(enemy, a) - distance(enemy, b),
       );
-    const target = party[0];
-    if (!target || distance(enemy, enemy.home) > 18) {
-      enemy.state = "IDLE";
+    let target = party[0];
+    if(profile && !target && profile.assist>0) {
+      const ally=[...e.enemies.values()].find(a=>a.id!==enemy.id&&a.encounterId===enemy.encounterId&&a.target&&distance(a,enemy)<profile.assist);
+      const candidate=e.run.party.find(c=>c.id===ally?.target&&c.alive);
+      if(candidate && distance(candidate,enemy.home)<profile.leash) target=candidate;
+    }
+    if (!target || distance(enemy, enemy.home) > (profile?.leash ?? 18) || (profile && distance(target,enemy.home)>profile.leash+2)) {
+      const returning=!!profile && (!!enemy.target || distance(enemy,enemy.home)>profile.radius+2);
+      enemy.state = returning?"RETURN_HOME":profile?.mode??"IDLE";
       enemy.target = undefined;
-      if (distance(enemy, enemy.home) > 2) e.move(enemy, enemy.home);
+      if(returning) {enemy.threat={};enemy.alerted=false;e.move(enemy,enemy.home);continue;}
+      if(profile) {
+        enemy.ambientTime=(enemy.ambientTime??0)-.25;
+        if(enemy.ambientTime<=0) {
+          const r=new SeededRandom(`${e.run.seed}:${enemy.encounterId}:${enemy.id}:${enemy.ambientStep??0}`);
+          enemy.ambientStep=(enemy.ambientStep??0)+1;
+          enemy.ambientTime=profile.rest+r.next()*3;
+          const rest=r.next()<.28;
+          enemy.state=rest?"REST":profile.mode==="REST"?"WANDER":profile.mode;
+          const angle=profile.mode==="PATROL"?(enemy.ambientStep%4)*Math.PI/2:r.next()*Math.PI*2;
+          const p={x:enemy.home.x+Math.cos(angle)*profile.radius,y:enemy.home.y+Math.sin(angle)*profile.radius};
+          // Ambient decisions never invoke A*: blocked strolls simply wait.
+          enemy.path=!rest&&lineWalkable(enemy,p,e.world.cell)?[p]:[];
+        }
+      } else if (distance(enemy, enemy.home) > 2) e.move(enemy, enemy.home);
       continue;
+    }
+    if(profile && !enemy.alerted) {
+      if(enemy.state!=="ALERT") {enemy.state="ALERT";enemy.timer=profile.alert*difficulty.alert;enemy.path=[];enemy.target=target.id;e.fx(enemy,"ring",0xe2c278,.5,.5,undefined,"!");}
+      if(enemy.timer>0)continue;
+      enemy.alerted=true;
     }
     enemy.target = target.id;
     for (const id of Object.keys(enemy.threat)) enemy.threat[id] *= 0.98;
     const d = distance(enemy, target),
       damage =
-        def.damage * (1 + 0.13 * (enemy.level - 1)) * (enemy.elite ? 1.35 : 1);
+        def.damage * (1 + 0.13 * (enemy.level - 1)) * (enemy.elite ? 1.35 : 1) * difficulty.damage;
     if (enemy.state === "CAST") {
       if (enemy.timer > 0) continue;
       if (def.behavior === "charger") {
@@ -198,7 +235,7 @@ export function tickAI(e: Engine, dt: number) {
             ).length - 1
           : 0;
       e.combat.hit(enemy.id, target, damage * (1 + Math.min(3, pack) * 0.2));
-      e.fx(enemy, "slash", 0xd8b792, 0.2, 1);
+      e.fx(enemy, "slash", 0xd8b792, 0.2, 1, undefined, undefined, Math.atan2(target.y - enemy.y, target.x - enemy.x));
     }
   }
 }
@@ -207,8 +244,27 @@ export function moveEntities(e: Engine, dt: number) {
     ...e.run.party.filter((c) => c.alive),
     ...e.enemies.values(),
   ]) {
+    // Knockback suave: desliza com decaimento, mesmo atordoado/parado.
+    if (c.knockX || c.knockY) {
+      const kx = c.knockX ?? 0, ky = c.knockY ?? 0;
+      const blocked = (x: number, y: number) =>
+        e.world.cell(Math.floor(x), Math.floor(y)).blocked;
+      const nx = c.x + kx * dt, ny = c.y + ky * dt;
+      if (!blocked(nx, ny)) {
+        c.x = nx;
+        c.y = ny;
+      } else if (!blocked(nx, c.y)) c.x = nx;
+      else if (!blocked(c.x, ny)) c.y = ny;
+      const decay = Math.exp(-8 * dt); // espelha CombatSystem.KNOCKBACK_DECAY
+      c.knockX = kx * decay;
+      c.knockY = ky * decay;
+      if (Math.hypot(c.knockX, c.knockY) < 0.05) {
+        c.knockX = 0;
+        c.knockY = 0;
+      }
+    }
     if (
-      c.statuses.some((s) => s.id === "stun") ||
+      isStunned(c) ||
       ("classId" in c && e.combat.movementLocked(c.id))
     )
       continue;

@@ -4,6 +4,7 @@ import type { Engine } from "../core/Engine";
 import { worldToIso, chunkAt } from "../world/WorldCoordinates";
 import { biomeRegistry } from "../data/biomes";
 import { balance } from "../data/balance";
+import { poiDefinition } from "../data/pois";
 export class WorldRenderer {
   private chunks = new Map<string, Phaser.GameObjects.GameObject[]>();
   private crowns = new Map<
@@ -184,6 +185,14 @@ export class WorldRenderer {
           .setOrigin(0.5, 0.86)
           .setDepth(pos.y);
         objects.push(sprite);
+        const site=poiDefinition(p);
+        if(site) {
+          sprite.setTexture(site.pieces[0].texture).setScale(site.pieces[0].scale??1);
+          for(const piece of site.pieces.slice(1)) {
+            const at=worldToIso({x:p.x+piece.x,y:p.y+piece.y});
+            objects.push(this.scene.add.image(at.x,at.y,piece.texture).setOrigin(.5,.86).setScale(piece.scale??1).setDepth(at.y));
+          }
+        }
         if (p.kind === "merchant" || p.kind === "shrine")
           crowns.push({ image: sprite, x: pos.x, y: pos.y });
         const label = this.scene.add
@@ -214,6 +223,7 @@ export class WorldRenderer {
           .setOrigin(0.5)
           .setDepth(pos.y + 200);
         objects.push(label);
+        if(site)label.setText(site.name);
         this.poiViews.set(p.id, { chunk: key, sprite, label });
       }
       this.chunks.set(key, objects);

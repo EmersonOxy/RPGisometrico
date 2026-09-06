@@ -1,6 +1,7 @@
 import type { BiomeId, Chunk, Poi } from "../core/types";
 import { sampleBiome, poisFor } from "./generation/WorldGenerator";
 import { balance } from "../data/balance";
+import { defaultWorldSettings } from "../data/worldSettings";
 export interface MapSummary {
   cells: BiomeId[];
   pois: Poi[];
@@ -16,7 +17,7 @@ export function summarizeChunk(c: Chunk): MapSummary {
       );
   return { cells, pois: c.pois };
 }
-export function reconstructSummary(seed: string, key: string): MapSummary {
+export function reconstructSummary(seed: string, key: string, version=2, settings=defaultWorldSettings): MapSummary {
   const [cx, cy] = key.split(",").map(Number),
     cells: BiomeId[] = [];
   for (let y = 0; y < 8; y++)
@@ -26,7 +27,8 @@ export function reconstructSummary(seed: string, key: string): MapSummary {
           seed,
           cx * balance.chunkSize + (x * balance.chunkSize) / 8,
           cy * balance.chunkSize + (y * balance.chunkSize) / 8,
+          settings,
         ),
       );
-  return { cells, pois: poisFor(seed, cx, cy) };
+  return { cells, pois: poisFor(seed, cx, cy, version, settings) };
 }
